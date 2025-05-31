@@ -38,22 +38,13 @@ export async function signInWithEmailAction(formData) {
       };
     }
 
-    // Ensure the session is properly set and up-to-date
+    // Ensure the session is properly set
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData.session) {
       return {
         error: "Failed to establish session. Please try again.",
         showResend: false,
       };
-    }
-    
-    // Double-check email confirmation status from Supabase directly
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      console.error("Error fetching user data:", userError);
-    } else if (userData?.user) {
-      // Update the session user with the latest user data
-      data.user = userData.user;
     }
 
     // Create or update user profile

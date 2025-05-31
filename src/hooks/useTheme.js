@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { STORAGE_KEYS, THEMES } from '../lib/constants';
 

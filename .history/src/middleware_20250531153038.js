@@ -12,15 +12,6 @@ export async function middleware(req) {
     data: { session },
     error,
   } = await supabase.auth.getSession();
-  
-  // If we have a session but need to verify user attributes, get the latest user data
-  if (session) {
-    const { data: userData } = await supabase.auth.getUser();
-    if (userData?.user) {
-      // Make sure we're using the most up-to-date user data
-      session.user = userData.user;
-    }
-  }
 
   // Log for debugging
   console.log("Middleware session check:", {
