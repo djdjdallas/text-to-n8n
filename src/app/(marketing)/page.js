@@ -9,7 +9,6 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/Card";
-import "/Users/dominickhill/ai-automation/src/app/globals.css";
 const features = [
   {
     icon: (
