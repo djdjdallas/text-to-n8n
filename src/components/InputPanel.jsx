@@ -38,7 +38,7 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border p-4">
         <h2 className="text-lg font-semibold">Natural Language Input</h2>
-        <div className="flex space-x-2">
+        <div className="flex space-x-4">
           <Button variant="outline" size="sm" onClick={handleClear}>
             Clear
           </Button>
@@ -54,7 +54,7 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Describe your automation workflow in plain English..."
-            className="h-full min-h-[300px] text-base"
+            className="h-full min-h-[200px] text-base"
             rows={20}
           />
           <div className="mt-2 flex justify-between text-xs text-muted">
@@ -66,10 +66,25 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
         <div className="border-t border-border p-4">
           <button
             type="button"
-            className="mb-4 flex w-full items-center justify-between text-sm font-medium"
+            className="mb-4 flex w-full items-center justify-between px-3 py-2 rounded-md border border-border hover:bg-card/50 text-sm font-medium"
             onClick={() => setShowAdvanced(!showAdvanced)}
           >
-            <span>Advanced Options</span>
+            <span className="flex items-center gap-2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+              Advanced Options
+            </span>
             <svg
               width="20"
               height="20"
@@ -78,14 +93,12 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
               className={`transform transition-transform ${
                 showAdvanced ? "rotate-180" : ""
               }`}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path
-                d="M6 9L12 15L18 9"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <path d="M6 9L12 15L18 9" />
             </svg>
           </button>
 
@@ -158,7 +171,7 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
               isLoading={isGenerating}
               disabled={input.trim() === ""}
             >
-              Generate Workflow
+              {isGenerating ? "Generating..." : "Generate Workflow"}
             </Button>
           </div>
         </div>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import InputPanel from '@/components/InputPanel';
 import OutputPanel from '@/components/OutputPanel';
@@ -71,21 +70,19 @@ export default function Dashboard() {
   };
   
   return (
-    <div className="flex h-screen flex-col">
-      <Header />
-      
+    <div className="flex h-full flex-col">      
       <main className="flex flex-1 overflow-hidden">
         <Sidebar isCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
         
         <div className="flex flex-1 overflow-hidden">
-          <div className="grid flex-1 grid-cols-1 md:grid-cols-2">
-            <div className="border-r border-border overflow-auto">
+          <div className="grid flex-1 grid-cols-1 md:grid-cols-2 max-h-full">
+            <div className="border-r border-border overflow-auto min-h-[300px] md:min-h-0">
               <InputPanel 
                 onGenerate={handleGenerate} 
                 isGenerating={isGenerating} 
               />
             </div>
-            <div className="overflow-auto">
+            <div className="overflow-auto min-h-[300px] md:min-h-0">
               <OutputPanel 
                 output={output} 
                 isGenerating={isGenerating} 

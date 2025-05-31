@@ -10,8 +10,8 @@ const BottomPanel = ({ metrics = {}, isCollapsed, togglePanel }) => {
   } = metrics;
   
   return (
-    <div className={`border-t border-border transition-all duration-300 ${isCollapsed ? 'h-10' : 'h-48'}`}>
-      <div className="flex h-10 items-center justify-between border-b border-border px-4">
+    <div className={`border-t border-border transition-all duration-300 ${isCollapsed ? 'h-8' : 'h-48'}`}>
+      <div className="flex h-8 items-center justify-between px-4">
         <h3 className="text-sm font-medium">Generation Metrics</h3>
         <button 
           onClick={togglePanel}

@@ -5,27 +5,27 @@ import Badge from './ui/Badge';
 const Sidebar = ({ isCollapsed, toggleSidebar }) => {
   const [activeTab, setActiveTab] = useState('history');
   
-  const sidebarWidth = isCollapsed ? 'w-12' : 'w-64';
+  const sidebarWidth = isCollapsed ? 'w-16' : 'w-64';
   
   const tabs = [
     { id: 'history', label: 'History', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path d="M12 8V12L15 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 8V12L15 15" />
+        <circle cx="12" cy="12" r="9" />
       </svg>
     ) },
     { id: 'templates', label: 'Templates', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path d="M4 4H20V20H4V4Z" stroke="currentColor" strokeWidth="2" />
-        <path d="M4 9H20" stroke="currentColor" strokeWidth="2" />
-        <path d="M9 9V20" stroke="currentColor" strokeWidth="2" />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4H20V20H4V4Z" />
+        <path d="M4 9H20" />
+        <path d="M9 9V20" />
       </svg>
     ) },
     { id: 'tips', label: 'Tips', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-        <path d="M12 16V12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <path d="M12 8H12.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 16V12" />
+        <path d="M12 8H12.01" />
+        <circle cx="12" cy="12" r="9" />
       </svg>
     ) },
   ];
@@ -132,11 +132,13 @@ const Sidebar = ({ isCollapsed, toggleSidebar }) => {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  className={`p-3 ${activeTab === tab.id ? 'text-primary bg-card/50' : 'text-muted hover:text-foreground hover:bg-card/30'}`}
+                  className={`p-3 flex justify-center ${activeTab === tab.id ? 'text-primary bg-card/50 border-l-2 border-primary' : 'text-muted hover:text-foreground hover:bg-card/30'}`}
                   onClick={() => setActiveTab(tab.id)}
                   title={tab.label}
                 >
-                  {tab.icon}
+                  <div className="w-6 h-6 flex items-center justify-center">
+                    {tab.icon}
+                  </div>
                 </button>
               ))}
             </div>
