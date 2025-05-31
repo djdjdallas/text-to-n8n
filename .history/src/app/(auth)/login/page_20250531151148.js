@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/button";
@@ -12,10 +12,6 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/Card";
-import {
-  signInWithEmailAction,
-  resendConfirmationAction,
-} from "@/app/actions/auth";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function LoginPage() {
@@ -25,33 +21,65 @@ export default function LoginPage() {
     ? decodeURIComponent(searchParams.get("redirectedFrom"))
     : "/dashboard";
 
-  const { signInWithProvider } = useAuth();
-  const [isPending, startTransition] = useTransition();
+  const { signIn, signInWithProvider } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showResendOption, setShowResendOption] = useState(false);
   const [resendEmail, setResendEmail] = useState("");
 
-  async function handleSubmit(formData) {
+  // Replace the current handleSubmit function with this:
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
     setError("");
     setShowResendOption(false);
 
-    startTransition(async () => {
-      const result = await signInWithEmailAction(formData);
+    try {
+      const { user } = await signIn(email, password);
 
-      if (result?.error) {
-        setError(result.error);
-        setShowResendOption(result.showResend || false);
-        setResendEmail(result.email || formData.get("email"));
+      // Check if email is confirmed
+      if (user && !user.email_confirmed_at) {
+        setError(
+          "Your email address has not been confirmed yet. Please check your inbox for the confirmation link."
+        );
+        setShowResendOption(true);
+        setResendEmail(email);
+        setIsLoading(false);
+        return;
       }
-      // If no error, the server action will redirect
-    });
-  }
 
-  async function handleResendConfirmation() {
-    startTransition(async () => {
-      const result = await resendConfirmationAction(resendEmail);
+      // If we get here, user is authenticated and email is confirmed
+      console.log("Login successful, redirecting to:", redirectTo);
 
-      if (result.success) {
+      // Use router.refresh() to update the server-side session
+      router.refresh();
+
+      // Then navigate to the destination
+      router.push(redirectTo);
+    } catch (error) {
+      console.error("Login error:", error);
+      // ... rest of error handling
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/auth/resend-confirmation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+
+      if (response.ok) {
         setError("");
         setShowResendOption(false);
         // Redirect to confirmation page with success message
@@ -62,10 +90,17 @@ export default function LoginPage() {
             )
         );
       } else {
-        setError(result.error || "Failed to resend confirmation email");
+        const data = await response.json();
+        setError(
+          data.error || "Failed to resend confirmation email. Please try again."
+        );
       }
-    });
-  }
+    } catch (error) {
+      setError("An error occurred while resending the confirmation email.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleOAuthSignIn = async (provider) => {
     try {
@@ -124,16 +159,15 @@ export default function LoginPage() {
               {showResendOption && (
                 <button
                   onClick={handleResendConfirmation}
-                  disabled={isPending}
+                  disabled={isLoading}
                   className="mt-2 text-primary hover:underline disabled:opacity-50 text-sm font-medium"
                 >
-                  {isPending ? "Sending..." : "Resend confirmation email"}
+                  {isLoading ? "Sending..." : "Resend confirmation email"}
                 </button>
               )}
             </div>
           )}
-          <form action={handleSubmit}>
-            <input type="hidden" name="redirectTo" value={redirectTo} />
+          <form onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-sm font-medium">
@@ -141,12 +175,12 @@ export default function LoginPage() {
                 </label>
                 <input
                   id="email"
-                  name="email"
                   type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   required
-                  disabled={isPending}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </div>
               <div className="space-y-2">
@@ -166,46 +200,21 @@ export default function LoginPage() {
                 </div>
                 <input
                   id="password"
-                  name="password"
                   type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
-                  disabled={isPending}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </div>
               <Button
                 type="submit"
                 className="w-full glow-primary"
                 size="lg"
-                disabled={isPending}
+                isLoading={isLoading}
               >
-                {isPending ? (
-                  <>
-                    <svg
-                      className="mr-2 h-4 w-4 animate-spin"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Signing In...
-                  </>
-                ) : (
-                  "Sign In"
-                )}
+                Sign In
               </Button>
 
               <div className="relative my-4">
@@ -223,7 +232,7 @@ export default function LoginPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isPending}
+                  disabled={isLoading}
                   onClick={() => handleOAuthSignIn("google")}
                 >
                   <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -249,7 +258,7 @@ export default function LoginPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  disabled={isPending}
+                  disabled={isLoading}
                   onClick={() => handleOAuthSignIn("github")}
                 >
                   <svg
