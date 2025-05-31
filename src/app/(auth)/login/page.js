@@ -17,7 +17,7 @@ import { useAuth } from "@/components/AuthProvider";
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectedFrom") || "/dashboard";
+  const redirectTo = searchParams.get("redirectedFrom") ? decodeURIComponent(searchParams.get("redirectedFrom")) : "/dashboard";
 
   const { signIn, signInWithProvider } = useAuth();
   const [email, setEmail] = useState("");
@@ -48,7 +48,13 @@ export default function LoginPage() {
       }
 
       // If we get here, user is authenticated and email is confirmed
-      router.push(redirectTo);
+      console.log("Login successful, redirecting to:", redirectTo);
+      
+      // Wait a moment to allow the session to be properly set
+      setTimeout(() => {
+        // Force a hard navigation instead of client-side navigation
+        window.location.href = redirectTo;
+      }, 500);
     } catch (error) {
       console.error("Login error:", error);
 

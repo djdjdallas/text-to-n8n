@@ -13,7 +13,23 @@ export async function middleware(req) {
   // Get the current user
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
+  
+  // For debugging only
+  console.log("Middleware auth state:", { 
+    path: req.nextUrl.pathname,
+    authenticated: !!user,
+    emailConfirmed: user?.email_confirmed_at ? true : false,
+    hasSession: !!session
+  });
+  
+  // If we couldn't get the user but have a session, bypass middleware
+  // This prevents redirect loops when session exists but auth is still syncing
+  if (userError && session) {
+    console.log("User error with session present, bypassing middleware");
+    return res;
+  }
 
   // Define protected routes
   const protectedRoutes = ["/dashboard"];
@@ -45,8 +61,15 @@ export async function middleware(req) {
 
   // Redirect logic for protected routes
   if (isProtectedRoute) {
-    // No user at all - redirect to login
-    if (!user) {
+    // If we have a session but no user data yet, allow access
+    // This prevents redirect loops during auth state synchronization
+    if (session && !user) {
+      console.log("Session exists but no user data yet, allowing access to protected route");
+      return res;
+    }
+    
+    // No session or user - redirect to login
+    if (!session && !user) {
       const redirectUrl = req.nextUrl.clone();
       redirectUrl.pathname = "/login";
       redirectUrl.searchParams.set("redirectedFrom", req.nextUrl.pathname);
@@ -67,8 +90,16 @@ export async function middleware(req) {
 
   // Redirect authenticated and confirmed users away from auth routes
   if (isAuthRoute && user && user.email_confirmed_at) {
+    // Check if there's a redirectedFrom parameter to honor that instead
+    const redirectedFrom = req.nextUrl.searchParams.get("redirectedFrom");
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = "/dashboard";
+    
+    if (redirectedFrom) {
+      redirectUrl.pathname = decodeURIComponent(redirectedFrom);
+    } else {
+      redirectUrl.pathname = "/dashboard";
+    }
+    
     return NextResponse.redirect(redirectUrl);
   }
 
