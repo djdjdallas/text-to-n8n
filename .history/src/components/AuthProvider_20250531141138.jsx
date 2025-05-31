@@ -57,7 +57,6 @@ export default function AuthProvider({ children }) {
   }, []);
 
   // Sign in with email and password
-  // Sign in with email and password
   const signIn = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -65,17 +64,7 @@ export default function AuthProvider({ children }) {
     });
 
     if (error) throw error;
-
-    // Get the latest user data after sign in
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) throw userError;
-
-    // Return both the auth data and the user
-    return { ...data, user };
+    return data;
   };
 
   // Sign up with email and password
