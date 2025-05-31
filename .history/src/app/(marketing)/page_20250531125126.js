@@ -206,12 +206,18 @@ export default function LandingPage() {
 
           <div className="flex items-center space-x-4">
             <Link href="/login" passHref>
-              <Button variant="ghost" size="sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="hover:float-animation"
+              >
                 Sign In
               </Button>
             </Link>
             <Link href="/signup" passHref>
-              <Button size="sm">Start your project</Button>
+              <Button size="sm" className="hover:float-animation">
+                Start your project
+              </Button>
             </Link>
           </div>
         </div>
@@ -237,7 +243,7 @@ export default function LandingPage() {
             style={{ animationDelay: "0.2s" }}
           >
             <Link href="/signup" passHref>
-              <Button size="lg" variant="outline">
+              <Button size="lg" className="glow-primary hover:float-animation">
                 Start Building for Free
               </Button>
             </Link>
@@ -466,7 +472,12 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline">Sign Up Free</Button>
+                    <Button
+                      variant="outline"
+                      className="w-full hover:float-animation"
+                    >
+                      Sign Up Free
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
@@ -572,7 +583,9 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline">Start Pro Trial</Button>
+                    <Button className="w-full hover:float-animation">
+                      Start Pro Trial
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
@@ -675,7 +688,10 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline" className="glow-primary">
+                    <Button
+                      variant="outline"
+                      className="w-full hover:float-animation"
+                    >
                       Contact Sales
                     </Button>
                   </Link>
@@ -700,7 +716,7 @@ export default function LandingPage() {
             FlowForge AI.
           </p>
           <Link href="/signup" passHref>
-            <Button size="lg" className="glow-primary">
+            <Button size="lg" className="glow-primary hover:float-animation">
               Get Started for Free
             </Button>
           </Link>

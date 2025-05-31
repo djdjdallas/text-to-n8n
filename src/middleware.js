@@ -20,7 +20,7 @@ export async function middleware(req) {
   );
   
   // Define auth routes
-  const authRoutes = ['/(auth)/login', '/(auth)/signup'];
+  const authRoutes = ['/login', '/signup'];
   const isAuthRoute = authRoutes.some(route => 
     req.nextUrl.pathname === route ||
     req.nextUrl.pathname.startsWith(route)
@@ -30,7 +30,7 @@ export async function middleware(req) {
   if (isProtectedRoute && !user) {
     // Redirect to login if trying to access protected route without auth
     const redirectUrl = req.nextUrl.clone();
-    redirectUrl.pathname = '/(auth)/login';
+    redirectUrl.pathname = '/login';
     redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname);
     return NextResponse.redirect(redirectUrl);
   }

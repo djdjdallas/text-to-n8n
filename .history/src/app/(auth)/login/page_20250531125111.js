@@ -140,7 +140,7 @@ export default function LoginPage() {
               </div>
               <Button
                 type="submit"
-                className="w-full glow-primary"
+                className="w-full"
                 size="lg"
                 isLoading={isLoading}
               >

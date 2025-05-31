@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import Button from "@/components/ui/button";
+import Button from "@/components/ui/Button";
 import {
   Card,
   CardContent,
@@ -205,12 +205,12 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center space-x-4">
-            <Link href="/login" passHref>
+            <Link href="/auth/login" passHref>
               <Button variant="ghost" size="sm">
                 Sign In
               </Button>
             </Link>
-            <Link href="/signup" passHref>
+            <Link href="/auth/signup" passHref>
               <Button size="sm">Start your project</Button>
             </Link>
           </div>
@@ -221,9 +221,9 @@ export default function LandingPage() {
       <section className="py-20 gradient-bg relative overflow-hidden">
         <div className="container mx-auto px-4 text-center relative z-10">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in">
-            Describe in seconds
+            Build in a weekend
             <br />
-            <span className="gradient-text">Automate forever</span>
+            <span className="gradient-text">Scale to millions</span>
           </h1>
           <p
             className="text-xl max-w-3xl mx-auto mb-10 text-muted-foreground animate-fade-in"
@@ -236,8 +236,8 @@ export default function LandingPage() {
             className="flex flex-col sm:flex-row justify-center gap-4 mb-16 animate-fade-in"
             style={{ animationDelay: "0.2s" }}
           >
-            <Link href="/signup" passHref>
-              <Button size="lg" variant="outline">
+            <Link href="/auth/signup" passHref>
+              <Button size="lg" className="glow-primary">
                 Start Building for Free
               </Button>
             </Link>
@@ -465,16 +465,18 @@ export default function LandingPage() {
                   </li>
                 </ul>
                 <div className="mt-6">
-                  <Link href="/signup" passHref>
-                    <Button variant="outline">Sign Up Free</Button>
+                  <Link href="/auth/signup" passHref>
+                    <Button variant="outline" className="w-full">
+                      Sign Up Free
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
             </Card>
 
             {/* Pro Plan */}
-            <Card className="border-primary/50 relative bg-card/70 transform scale-105 shadow-lg shadow-primary/20">
-              <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">
+            <Card className="border-primary relative">
+              <div className="absolute top-0 right-0 bg-primary text-white text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-lg">
                 Popular
               </div>
               <CardHeader>
@@ -571,8 +573,8 @@ export default function LandingPage() {
                   </li>
                 </ul>
                 <div className="mt-6">
-                  <Link href="/signup" passHref>
-                    <Button variant="outline">Start Pro Trial</Button>
+                  <Link href="/auth/signup" passHref>
+                    <Button className="w-full">Start Pro Trial</Button>
                   </Link>
                 </div>
               </CardContent>
@@ -674,8 +676,8 @@ export default function LandingPage() {
                   </li>
                 </ul>
                 <div className="mt-6">
-                  <Link href="/signup" passHref>
-                    <Button variant="outline" className="glow-primary">
+                  <Link href="/auth/signup" passHref>
+                    <Button variant="outline" className="w-full">
                       Contact Sales
                     </Button>
                   </Link>
@@ -699,7 +701,7 @@ export default function LandingPage() {
             Join thousands of users who are building automations 10x faster with
             FlowForge AI.
           </p>
-          <Link href="/signup" passHref>
+          <Link href="/auth/signup" passHref>
             <Button size="lg" className="glow-primary">
               Get Started for Free
             </Button>

@@ -466,7 +466,12 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline">Sign Up Free</Button>
+                    <Button
+                      variant="outline"
+                      className="w-full hover:float-animation"
+                    >
+                      Sign Up Free
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
@@ -572,7 +577,9 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline">Start Pro Trial</Button>
+                    <Button className="w-full hover:float-animation">
+                      Start Pro Trial
+                    </Button>
                   </Link>
                 </div>
               </CardContent>
@@ -675,7 +682,10 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline" className="glow-primary">
+                    <Button
+                      variant="outline"
+                      className="w-full hover:float-animation"
+                    >
                       Contact Sales
                     </Button>
                   </Link>
@@ -700,7 +710,7 @@ export default function LandingPage() {
             FlowForge AI.
           </p>
           <Link href="/signup" passHref>
-            <Button size="lg" className="glow-primary">
+            <Button size="lg" className="glow-primary hover:float-animation">
               Get Started for Free
             </Button>
           </Link>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Button from "@/components/ui/button";
 import {
   Card,
@@ -14,40 +14,51 @@ import {
 } from "@/components/ui/Card";
 import { useAuth } from "@/components/AuthProvider";
 
-export default function LoginPage() {
+export default function SignUpPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectedFrom") || "/dashboard";
+  const { signUp, signInWithProvider } = useAuth();
 
-  const { signIn, signInWithProvider } = useAuth();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
+    if (!agreedToTerms) {
+      setError("You must agree to the Terms of Service and Privacy Policy");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      await signIn(email, password);
-      router.push(redirectTo);
+      await signUp(email, password, { name });
+
+      // In Supabase, the user needs to confirm their email by default
+      // You can either redirect to a confirmation page or dashboard depending on your setup
+      router.push("/auth/confirm-email");
     } catch (error) {
-      console.error("Login error:", error);
-      setError(error.message || "Invalid email or password. Please try again.");
+      console.error("Signup error:", error);
+      setError(
+        error.message || "An error occurred during sign up. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOAuthSignIn = async (provider) => {
+  const handleOAuthSignUp = async (provider) => {
     try {
       await signInWithProvider(provider);
       // The redirect is handled by Supabase OAuth flow
     } catch (error) {
-      console.error(`${provider} sign in error:`, error);
-      setError(`Failed to sign in with ${provider}. Please try again.`);
+      console.error(`${provider} sign up error:`, error);
+      setError(`Failed to sign up with ${provider}. Please try again.`);
     }
   };
 
@@ -86,9 +97,11 @@ export default function LoginPage() {
               />
             </svg>
           </div>
-          <CardTitle className="text-2xl text-center">Welcome back</CardTitle>
+          <CardTitle className="text-2xl text-center">
+            Create an account
+          </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your FlowForge AI account
+            Enter your information to get started with FlowForge AI
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -99,6 +112,20 @@ export default function LoginPage() {
           )}
           <form onSubmit={handleSubmit}>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="name" className="block text-sm font-medium">
+                  Full Name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  required
+                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+              </div>
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-sm font-medium">
                   Email
@@ -114,20 +141,9 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium"
-                  >
-                    Password
-                  </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
+                <label htmlFor="password" className="block text-sm font-medium">
+                  Password
+                </label>
                 <input
                   id="password"
                   type="password"
@@ -137,14 +153,45 @@ export default function LoginPage() {
                   required
                   className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
+                <p className="text-xs text-muted">
+                  Password must be at least 8 characters long
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <input
+                    id="terms"
+                    type="checkbox"
+                    checked={agreedToTerms}
+                    onChange={(e) => setAgreedToTerms(e.target.checked)}
+                    required
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  <label htmlFor="terms" className="ml-2 text-xs text-muted">
+                    I agree to the{" "}
+                    <Link
+                      href="/terms"
+                      className="text-primary hover:underline"
+                    >
+                      Terms of Service
+                    </Link>{" "}
+                    and{" "}
+                    <Link
+                      href="/privacy"
+                      className="text-primary hover:underline"
+                    >
+                      Privacy Policy
+                    </Link>
+                  </label>
+                </div>
               </div>
               <Button
                 type="submit"
-                className="w-full glow-primary"
+                className="w-full"
                 size="lg"
                 isLoading={isLoading}
               >
-                Sign In
+                Create Account
               </Button>
 
               <div className="relative my-4">
@@ -163,7 +210,7 @@ export default function LoginPage() {
                   type="button"
                   variant="outline"
                   disabled={isLoading}
-                  onClick={() => handleOAuthSignIn("google")}
+                  onClick={() => handleOAuthSignUp("google")}
                 >
                   <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                     <path
@@ -189,7 +236,7 @@ export default function LoginPage() {
                   type="button"
                   variant="outline"
                   disabled={isLoading}
-                  onClick={() => handleOAuthSignIn("github")}
+                  onClick={() => handleOAuthSignUp("github")}
                 >
                   <svg
                     className="mr-2 h-4 w-4"
@@ -206,9 +253,9 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted">
-            Don't have an account?{" "}
-            <Link href="/signup" className="text-primary hover:underline">
-              Sign up
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
             </Link>
           </p>
         </CardFooter>

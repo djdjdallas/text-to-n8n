@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+:root {
+  --radius: 0.625rem;
+  --background: 255 255 255;
+  --foreground: 10 10 10;
+  --card: 255 255 255;
+  --card-foreground: 10 10 10;
+  --popover: 255 255 255;
+  --popover-foreground: 10 10 10;
+  --primary: 24 24 27;
+  --primary-foreground: 250 250 250;
+  --secondary: 244 244 245;
+  --secondary-foreground: 24 24 27;
+  --muted: 244 244 245;
+  --muted-foreground: 113 113 122;
+  --accent: 244 244 245;
+  --accent-foreground: 24 24 27;
+  --destructive: 239 68 68;
+  --destructive-foreground: 250 250 250;
+  --border: 228 228 231;
+  --input: 228 228 231;
+  --ring: 161 161 170;
+  --chart-1: 251 146 60;
+  --chart-2: 56 189 248;
+  --chart-3: 99 102 241;
+  --chart-4: 132 204 22;
+  --chart-5: 234 179 8;
+  --sidebar: 250 250 250;
+  --sidebar-foreground: 10 10 10;
+  --sidebar-primary: 24 24 27;
+  --sidebar-primary-foreground: 250 250 250;
+  --sidebar-accent: 244 244 245;
+  --sidebar-accent-foreground: 24 24 27;
+  --sidebar-border: 228 228 231;
+  --sidebar-ring: 161 161 170;
+}
+
+.dark {
+  --background: 10 10 10;
+  --foreground: 250 250 250;
+  --card: 24 24 27;
+  --card-foreground: 250 250 250;
+  --popover: 24 24 27;
+  --popover-foreground: 250 250 250;
+  --primary: 228 228 231;
+  --primary-foreground: 24 24 27;
+  --secondary: 39 39 42;
+  --secondary-foreground: 250 250 250;
+  --muted: 39 39 42;
+  --muted-foreground: 161 161 170;
+  --accent: 39 39 42;
+  --accent-foreground: 250 250 250;
+  --destructive: 220 38 38;
+  --destructive-foreground: 250 250 250;
+  --border: 39 39 42;
+  --input: 39 39 42;
+  --ring: 113 113 122;
+  --chart-1: 139 92 246;
+  --chart-2: 16 185 129;
+  --chart-3: 234 179 8;
+  --chart-4: 236 72 153;
+  --chart-5: 249 115 22;
+  --sidebar: 24 24 27;
+  --sidebar-foreground: 250 250 250;
+  --sidebar-primary: 139 92 246;
+  --sidebar-primary-foreground: 250 250 250;
+  --sidebar-accent: 39 39 42;
+  --sidebar-accent-foreground: 250 250 250;
+  --sidebar-border: 39 39 42;
+  --sidebar-ring: 113 113 122;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+}
+
+/* Gradient background utility */
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.1) 0%, hsl(var(--secondary) / 0.1) 100%);
+}
+
+/* Glass effect utility */
+.glass {
+  backdrop-filter: blur(10px);
+  background-color: hsl(var(--background) / 0.8);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Animation utilities */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

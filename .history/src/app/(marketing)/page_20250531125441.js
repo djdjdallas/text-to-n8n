@@ -675,9 +675,7 @@ export default function LandingPage() {
                 </ul>
                 <div className="mt-6">
                   <Link href="/signup" passHref>
-                    <Button variant="outline" className="glow-primary">
-                      Contact Sales
-                    </Button>
+                    <Button variant="outline">Contact Sales</Button>
                   </Link>
                 </div>
               </CardContent>
