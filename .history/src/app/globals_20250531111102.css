@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Use CSS variables for theming */
+:root {
+  --background: 220 26% 14%;
+  --foreground: 210 40% 98%;
+  --card: 217 33% 17%;
+  --primary: 263 70% 50%;
+  --secondary: 210 40% 96%;
+  --accent: 142 70% 45%;
+  --muted: 215 20% 65%;
+  --border: 217 33% 27%;
+}
+
+/* Light theme overrides */
+.light {
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+  --card: 0 0% 98%;
+  --primary: 262.1 83.3% 57.8%;
+  --secondary: 210 40% 96.1%;
+  --accent: 142 76.2% 36.3%;
+  --muted: 220 14.3% 75.9%;
+  --border: 220 13% 91%;
+}
+
+/* Gradient background */
+.gradient-bg {
+  background: linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%);
+}
+
+/* Glassmorphic effects */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth animations */
+* {
+  transition: all 0.2s ease;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}

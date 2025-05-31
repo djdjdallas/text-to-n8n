@@ -28,7 +28,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.8",
     "autoprefixer": "^10.4.21",
-    "tailwindcss": "^4.1.5",
-    "tw-animate-css": "^1.2.9"
+    "tailwindcss": "^4.1.5"
   }
 }
