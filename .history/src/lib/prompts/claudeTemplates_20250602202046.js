@@ -41,16 +41,6 @@ export class ClaudePromptOptimizer {
     // Build structured prompt sections
     const sections = [];
 
-    // 0. Critical Field Restrictions (Pre-instruction)
-    sections.push(`## 🚨 CRITICAL WORKFLOW FORMAT RESTRICTION
-    
-Your output MUST be a valid ${platform} workflow JSON containing ONLY these fields:
-- name, nodes, connections, settings, meta (REQUIRED)
-- versionId, pinData, staticData, tags (OPTIONAL)
-
-❌ STRICTLY FORBIDDEN: Never include _metadata or any underscore-prefixed fields!
-These will cause the workflow to fail when imported into ${platform}.`);
-
     // 1. Task Definition
     sections.push(this.buildTaskDefinition(platform, complexity));
 
@@ -75,20 +65,6 @@ These will cause the workflow to fail when imported into ${platform}.`);
 
     // 7. Critical instructions
     sections.push(this.buildCriticalInstructions());
-
-    // 8. Final reminder about metadata
-    sections.push(`## 🚨 FINAL REMINDER - VALIDATE BEFORE SUBMITTING
-    
-BEFORE submitting your response, verify your workflow JSON contains ONLY these fields:
-- name, nodes, connections, settings, meta, [versionId], [pinData], [staticData], [tags]
-
-❌ REMOVE ALL non-standard fields, especially:
-- _metadata (WILL CAUSE IMPORT FAILURE)
-- instructions (WILL CAUSE IMPORT FAILURE)
-- validation (WILL CAUSE IMPORT FAILURE)
-- Any field starting with underscore "_" (WILL CAUSE IMPORT FAILURE)
-
-Your ENTIRE response must be ONLY the JSON object with ONLY standard fields.`);
 
     return sections.join("\n\n");
   }
@@ -401,43 +377,13 @@ Include error branches, iterators, and complex data processing...`,
    * Build output requirements
    */
   buildOutputRequirements(platform) {
-    return `## 🔴 OUTPUT REQUIREMENTS - STRICTLY FOLLOW THESE
+    return `## Output Requirements
 
-1. Your output MUST be valid JSON only - no text before or after
-2. You MUST include all required fields for ${platform}
-3. You MUST use proper data types (strings, numbers, booleans, arrays, objects)
-4. You MUST have valid connections/routes between nodes/steps
-5. You MUST use correct node/app names and types
-
-🚨 CRITICAL FORMAT REQUIREMENTS:
-Your output MUST be a valid ${platform} workflow JSON containing ONLY these fields:
-
-✅ REQUIRED FIELDS (MUST include):
-- name (String)
-- nodes (Array)
-- connections (Object)
-- settings (Object)
-- meta (Object)
-
-✅ OPTIONAL FIELDS (may include):
-- versionId (String)
-- pinData (Object)
-- staticData (null or Object)
-- tags (Array)
-
-❌ STRICTLY FORBIDDEN FIELDS (NEVER include):
-- _metadata (WILL CAUSE IMPORT FAILURE)
-- instructions (WILL CAUSE IMPORT FAILURE)
-- validation (WILL CAUSE IMPORT FAILURE)
-- Any field starting with underscore "_" (WILL CAUSE IMPORT FAILURE)
-- Any field not explicitly listed in the required or optional sections above
-
-⚠️ CRITICAL WARNING: The workflow will FAIL to import if you include ANY non-standard fields!
-You MUST verify your final output contains ONLY standard fields before responding.
-
-FINAL VALIDATION: Before submitting, verify your JSON contains ONLY these top-level fields:
-name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
-NO OTHER FIELDS ARE ALLOWED!`;
+1. MUST be valid JSON only - no text before or after
+2. MUST include all required fields for ${platform}
+3. MUST use proper data types (strings, numbers, booleans, arrays, objects)
+4. MUST have valid connections/routes between nodes/steps
+5. MUST use correct node/app names and types`;
   }
 
   /**
@@ -466,58 +412,18 @@ NO OTHER FIELDS ARE ALLOWED!`;
    * Build critical instructions
    */
   buildCriticalInstructions() {
-    return `## ‼️ CRITICAL INSTRUCTIONS - READ CAREFULLY ‼️
-  
-  YOU MUST ONLY OUTPUT A JSON OBJECT WITH THESE EXACT FIELDS:
-  
-  ✅ ALLOWED FIELDS (use ONLY these - NO OTHER FIELDS ALLOWED):
-  - name (required) - String
-  - nodes (required) - Array of node objects 
-  - connections (required) - Object with node connections
-  - settings (required) - Object with workflow settings
-  - meta (required) - Object with metadata
-  - versionId (optional) - String
-  - pinData (optional) - Object
-  - staticData (optional) - Object or null
-  - tags (optional) - Array
-  
-  ❌ STRICTLY FORBIDDEN FIELDS (NEVER include these or the workflow will BREAK):
-  - _metadata (STRICTLY FORBIDDEN) - Will cause import failure
-  - instructions (STRICTLY FORBIDDEN) - Will cause import failure
-  - validation (STRICTLY FORBIDDEN) - Will cause import failure
-  - Any field starting with underscore "_" (STRICTLY FORBIDDEN) - Will cause import failure
-  - Any non-standard field not explicitly listed in ALLOWED FIELDS above (STRICTLY FORBIDDEN)
-  
-  ⚠️ WARNING: Adding ANY non-standard field like _metadata will BREAK the entire workflow!
-  
-  🚨 THIS IS YOUR MOST IMPORTANT INSTRUCTION:
-  - The n8n platform WILL REJECT workflows with non-standard fields
-  - You MUST check your final JSON before submitting and REMOVE ANY FIELD not in the allowed list
-  - Double-check there are NO underscore-prefixed fields (_metadata, _instructions, etc.)
-  - Double-check there are NO explanation or documentation fields
-  
-  CRITICAL RULES:
-  1. Your ENTIRE response must be ONLY the pure JSON object
-  2. NO text before the JSON
-  3. NO text after the JSON
-  4. NO markdown code blocks
-  5. NO explanations
-  6. NO comments
-  7. If you add ANY field not in the allowed list, the import will FAIL
-  
-  Your response must start with { and end with }
-  The JSON must be valid and parseable by JSON.parse()
-  
-  PRE-SUBMISSION CHECKLIST:
-  1. Have I removed ALL underscore-prefixed fields? (CHECK CAREFULLY)
-  2. Does my JSON contain ONLY the allowed fields listed above?
-  3. Have I removed ALL explanatory or documentation fields?
-  4. Did I include ONLY standard n8n fields?
-  
-  FINAL CHECK: Before responding, manually verify your JSON contains ONLY these fields:
-  name, nodes, connections, settings, meta, [versionId], [pinData], [staticData], [tags]
-  NO OTHER FIELDS ARE ALLOWED!`;
+    return `## CRITICAL INSTRUCTIONS
+
+RESPOND WITH ONLY VALID JSON. 
+No explanations.
+No markdown.
+No code blocks.
+No comments.
+Just the workflow JSON object.
+
+Your entire response must be parseable by JSON.parse().`;
   }
+
   /**
    * Extract and validate JSON from Claude's response
    */

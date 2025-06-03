@@ -9,12 +9,33 @@ import { validateRequest } from "@/lib/validators/requestValidator";
 
 /**
  * Clean workflow object by removing non-standard fields
- * This is VERY strict to ensure only allowed fields are included
  */
 function cleanWorkflowForExport(workflow, platform = "n8n") {
   if (platform === "n8n") {
-    // STRICT APPROACH: Create a completely new object with ONLY the allowed fields
-    // This ensures no metadata or unexpected fields can possibly remain
+    // Create a clean copy with only n8n-standard fields
+    const cleanWorkflow = {
+      name: workflow.name,
+      nodes: workflow.nodes,
+      connections: workflow.connections,
+      settings: workflow.settings || { executionOrder: "v1" },
+      meta: workflow.meta || { instanceId: "workflow_instance_id" },
+    };
+
+    // Add optional fields only if they exist
+    if (workflow.versionId !== undefined) {
+      cleanWorkflow.versionId = workflow.versionId;
+    }
+    if (workflow.pinData !== undefined) {
+      cleanWorkflow.pinData = workflow.pinData || {};
+    }
+    if (workflow.staticData !== undefined) {
+      cleanWorkflow.staticData = workflow.staticData || null;
+    }
+    if (workflow.tags !== undefined) {
+      cleanWorkflow.tags = workflow.tags || [];
+    }
+
+    // Remove any fields that start with underscore or any non-standard fields
     const allowedFields = [
       "name",
       "nodes",
@@ -26,76 +47,24 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
       "staticData",
       "tags",
     ];
-    
-    // Initialize the clean workflow with required fields
-    const cleanWorkflow = {
-      name: workflow.name || "Generated Workflow",
-      nodes: Array.isArray(workflow.nodes) ? [...workflow.nodes] : [],
-      connections: workflow.connections ? {...workflow.connections} : {},
-      settings: workflow.settings ? {...workflow.settings} : { executionOrder: "v1" },
-      meta: workflow.meta ? {...workflow.meta} : { instanceId: "workflow_instance_id" },
-    };
-    
-    // Only add optional fields if they exist in the original and are in the allowed list
-    if (workflow.versionId !== undefined) {
-      cleanWorkflow.versionId = workflow.versionId;
-    }
-    if (workflow.pinData !== undefined) {
-      cleanWorkflow.pinData = typeof workflow.pinData === 'object' ? {...workflow.pinData} : {};
-    }
-    if (workflow.staticData !== undefined) {
-      cleanWorkflow.staticData = workflow.staticData === null ? null : 
-        (typeof workflow.staticData === 'object' ? {...workflow.staticData} : null);
-    }
-    if (workflow.tags !== undefined) {
-      cleanWorkflow.tags = Array.isArray(workflow.tags) ? [...workflow.tags] : [];
-    }
-    
-    // Double-check: remove any fields that might have snuck in
-    for (const key in cleanWorkflow) {
+
+    Object.keys(cleanWorkflow).forEach((key) => {
       if (!allowedFields.includes(key)) {
         delete cleanWorkflow[key];
       }
-    }
-    
-    // Deep clean: ensure no _metadata in nested objects
-    const deepClean = (obj) => {
-      if (!obj || typeof obj !== 'object') return;
-      
-      // Clean current level
-      for (const key in obj) {
-        if (key.startsWith('_') || key === 'metadata' || key === 'instructions' || key === 'validation') {
-          delete obj[key];
-        } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-          // Recursively clean nested objects and arrays
-          deepClean(obj[key]);
-        }
-      }
-    };
-    
-    // Apply deep cleaning to the entire workflow
-    deepClean(cleanWorkflow);
-    
+    });
+
     return cleanWorkflow;
   }
 
-  // For other platforms, create a clean copy without metadata
-  const cleaned = JSON.parse(JSON.stringify(workflow)); // Deep clone
-  
-  // Remove metadata at all levels
-  const deepClean = (obj) => {
-    if (!obj || typeof obj !== 'object') return;
-    
-    for (const key in obj) {
-      if (key.startsWith('_') || key === 'metadata' || key === 'instructions' || key === 'validation') {
-        delete obj[key];
-      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        deepClean(obj[key]);
-      }
+  // For other platforms, just remove underscore-prefixed fields
+  const cleaned = { ...workflow };
+  Object.keys(cleaned).forEach((key) => {
+    if (key.startsWith("_")) {
+      delete cleaned[key];
     }
-  };
-  
-  deepClean(cleaned);
+  });
+
   return cleaned;
 }
 
@@ -205,70 +174,39 @@ export async function POST(req) {
       claudeResponse.model
     );
 
-    // 10. Create response with metadata separate from workflow
-    const metadataObject = {
-      provider,
-      model: claudeResponse.model || extractedMetadata.aiMetadata?.model,
-      generationTime,
-      inputTokens,
-      outputTokens,
-      cost: cost.totalCost,
-      platform,
-      complexity,
-      ragEnhanced: useRAG,
-      ...ragMetadata,
+    // 10. Create response
+    const response = {
+      success: true,
+      workflow: cleanedWorkflow, // Return the CLEANED workflow
+      validation: validationResult,
+      metadata: {
+        provider,
+        model: claudeResponse.model || extractedMetadata.aiMetadata?.model,
+        generationTime,
+        inputTokens,
+        outputTokens,
+        cost: cost.totalCost,
+        platform,
+        complexity,
+        ragEnhanced: useRAG,
+        ...ragMetadata,
+        ...extractedMetadata,
+      },
     };
-    
-    // Only add any extracted AI metadata to the metadata, not to the workflow
-    if (extractedMetadata.aiMetadata) {
-      metadataObject.aiMetadata = extractedMetadata.aiMetadata;
-    }
 
-    // 11. Add helpful copy instructions 
-    const instructions = [];
+    // 11. Add helpful copy instructions for n8n
     if (platform === "n8n") {
-      instructions.push(
+      response.instructions = [
         "To import this workflow into n8n:",
-        "1. Copy the JSON workflow below",
+        "1. Copy the entire 'workflow' object below",
         "2. In n8n, click the menu (three dots) and select 'Import from File'",
         "3. Or press Ctrl+Shift+V (or Cmd+Shift+V on Mac) in the n8n editor",
         "4. Paste the JSON and click 'Import'",
-        "Note: You'll need to set up your own credentials for each service"
-      );
-    }
-    
-    // Separate response structure for API metadata vs. the actual workflow
-    const response = {
-      success: true,
-      instructions,
-      metadata: metadataObject,
-      validation: validationResult,
-      // For client rendering/information purposes
-      workflow: cleanedWorkflow,
-    };
-    
-    // EMERGENCY FIX: Create a separate endpoint for copy functionality
-    if (platform === "n8n") {
-      // Create a completely separate workflow JSON with absolutely nothing but the allowed fields
-      const importReadyWorkflow = {
-        name: cleanedWorkflow.name || "Generated Workflow",
-        nodes: cleanedWorkflow.nodes || [],
-        connections: cleanedWorkflow.connections || {},
-        settings: cleanedWorkflow.settings || { executionOrder: "v1" },
-        meta: cleanedWorkflow.meta || { instanceId: "workflow_instance_id" },
-      };
-      
-      // Only add optional fields if they exist and aren't empty
-      if (cleanedWorkflow.versionId) importReadyWorkflow.versionId = cleanedWorkflow.versionId;
-      if (cleanedWorkflow.pinData) importReadyWorkflow.pinData = cleanedWorkflow.pinData;
-      if (cleanedWorkflow.staticData !== undefined) importReadyWorkflow.staticData = cleanedWorkflow.staticData;
-      if (cleanedWorkflow.tags && cleanedWorkflow.tags.length > 0) importReadyWorkflow.tags = cleanedWorkflow.tags;
-      
-      // Set directly as a string to avoid any chance of mutation
-      response.copyableJSON = JSON.stringify(importReadyWorkflow, null, 2);
-      
-      // Also provide a direct import endpoint for copying
-      response.directImportUrl = `/api/workflow/export/${Date.now()}`;
+        "Note: You'll need to set up your own credentials for each service",
+      ];
+
+      // Provide clean JSON for copying
+      response.copyableJSON = JSON.stringify(cleanedWorkflow, null, 2);
     }
 
     return NextResponse.json(response);
