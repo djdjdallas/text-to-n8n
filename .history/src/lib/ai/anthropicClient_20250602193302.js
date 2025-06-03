@@ -8,7 +8,7 @@ export class AnthropicClient {
   constructor() {
     this.apiKey = process.env.ANTHROPIC_API_KEY;
     this.baseUrl = "https://api.anthropic.com/v1";
-    this.defaultModel = "claude-3-7-sonnet-20250219";
+    this.defaultModel = "claude-3.7-sonnet-20250219";
     this.maxRetries = 3;
     this.retryDelay = 1000; // 1 second
 
@@ -208,7 +208,7 @@ export class AnthropicClient {
    */
   getAvailableModels() {
     return {
-      "claude-3-7-sonnet-20250219": {
+      "claude-3.7-sonnet-20250219": {
         name: "Claude 3.5 Sonnet",
         contextWindow: 200000,
         outputTokens: 8192,
@@ -245,12 +245,12 @@ export class AnthropicClient {
    */
   calculateCost(inputTokens, outputTokens, model = this.defaultModel) {
     const pricing = {
-      "claude-3-7-sonnet-20250219": { input: 0.003, output: 0.015 },
+      "claude-3.7-sonnet-20250219": { input: 0.003, output: 0.015 },
       "claude-3-haiku-20240307": { input: 0.00025, output: 0.00125 },
       "claude-3-opus-20240229": { input: 0.015, output: 0.075 },
     };
 
-    const rates = pricing[model] || pricing["claude-3-7-sonnet-20250219"];
+    const rates = pricing[model] || pricing["claude-3.7-sonnet-20250219"];
 
     return {
       inputCost: (inputTokens / 1000) * rates.input,
