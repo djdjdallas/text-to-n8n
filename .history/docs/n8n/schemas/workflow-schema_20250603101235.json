@@ -1,0 +1,272 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "n8n Workflow Schema",
+    "description": "Complete JSON schema for n8n workflows (v1.0+)",
+    "type": "object",
+    "required": ["name", "nodes", "connections"],
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Display name of the workflow",
+        "maxLength": 128
+      },
+      "nodes": {
+        "type": "array",
+        "description": "List of all node objects within the workflow",
+        "items": {
+          "$ref": "#/definitions/node"
+        }
+      },
+      "connections": {
+        "type": "object",
+        "description": "Defines the data flow and links between nodes",
+        "additionalProperties": {
+          "$ref": "#/definitions/nodeConnections"
+        }
+      },
+      "active": {
+        "type": "boolean",
+        "description": "Indicates if the workflow is enabled (true) or disabled (false)",
+        "default": false
+      },
+      "settings": {
+        "$ref": "#/definitions/workflowSettings"
+      },
+      "staticData": {
+        "type": "object",
+        "description": "Stores small, persistent data accessible across workflow executions",
+        "additionalProperties": true
+      },
+      "pinData": {
+        "type": "object",
+        "description": "Stores 'pinned' test data for development, ignored in production",
+        "additionalProperties": true
+      },
+      "versionId": {
+        "type": "string",
+        "description": "Unique identifier for a specific version of the workflow"
+      },
+      "meta": {
+        "$ref": "#/definitions/workflowMeta"
+      },
+      "id": {
+        "type": "string",
+        "description": "Unique identifier for the workflow",
+        "pattern": "^[a-fA-F0-9-]+$"
+      },
+      "createdAt": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Timestamp of workflow creation"
+      },
+      "updatedAt": {
+        "type": "string",
+        "format": "date-time",
+        "description": "Timestamp of last workflow modification"
+      },
+      "triggerCount": {
+        "type": "integer",
+        "description": "Number of times the workflow has been triggered",
+        "minimum": 0
+      },
+      "tags": {
+        "type": "array",
+        "description": "Categorization tags for the workflow",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "definitions": {
+      "node": {
+        "type": "object",
+        "required": ["id", "name", "type", "typeVersion", "position", "parameters"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the node",
+            "pattern": "^[a-fA-F0-9-]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the node (must be unique within workflow)"
+          },
+          "type": {
+            "type": "string",
+            "description": "Full type identifier of the node",
+            "pattern": "^n8n-nodes-(base|[a-zA-Z0-9-]+)\\.[a-zA-Z0-9]+$"
+          },
+          "typeVersion": {
+            "type": "number",
+            "description": "Version of the node type"
+          },
+          "position": {
+            "type": "array",
+            "description": "[x, y] coordinates on the canvas",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Configurable options for the node (structure varies by node type)",
+            "additionalProperties": true
+          },
+          "credentials": {
+            "type": "object",
+            "description": "References to credentials used by the node",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "executeOnce": {
+            "type": "boolean",
+            "description": "If true, node executes only once for the first item",
+            "default": false
+          },
+          "alwaysOutputData": {
+            "type": "boolean",
+            "description": "If true, node always outputs an empty item if no data",
+            "default": false
+          },
+          "retryOnFail": {
+            "type": "boolean",
+            "description": "If true, node reruns until it succeeds",
+            "default": false
+          },
+          "notes": {
+            "type": "object",
+            "properties": {
+              "notes": {
+                "type": "string",
+                "description": "Documentation notes for the node"
+              },
+              "displayNoteInFlow": {
+                "type": "boolean",
+                "description": "Whether to display the note in the workflow UI"
+              }
+            }
+          }
+        }
+      },
+      "nodeConnections": {
+        "type": "object",
+        "description": "Connections from a source node",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/connectionTarget"
+            }
+          }
+        }
+      },
+      "connectionTarget": {
+        "type": "object",
+        "required": ["node", "type", "index"],
+        "properties": {
+          "node": {
+            "type": "string",
+            "description": "Name of the target node"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of input on the target node",
+            "enum": ["main", "error"]
+          },
+          "index": {
+            "type": "integer",
+            "description": "Index of the input on the target node",
+            "minimum": 0
+          }
+        }
+      },
+      "workflowSettings": {
+        "type": "object",
+        "description": "Workflow-specific configurations",
+        "properties": {
+          "executionOrder": {
+            "type": "string",
+            "description": "Defines how multi-branch workflows execute",
+            "enum": ["v0", "v1"],
+            "default": "v1"
+          },
+          "errorWorkflow": {
+            "type": "string",
+            "description": "Workflow ID/Name to trigger if current workflow fails"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "IANA timezone for the workflow",
+            "default": "America/New_York"
+          },
+          "saveFailedProductionExecutions": {
+            "type": "boolean",
+            "description": "Whether to save failed executions for active workflows",
+            "default": true
+          },
+          "saveSuccessfulProductionExecutions": {
+            "type": "boolean",
+            "description": "Whether to save successful executions for active workflows",
+            "default": false
+          },
+          "saveManualExecutions": {
+            "type": "boolean",
+            "description": "Whether to save executions for workflows started manually",
+            "default": true
+          },
+          "saveExecutionProgress": {
+            "type": "boolean",
+            "description": "Whether to save execution data for each node for resuming",
+            "default": false
+          },
+          "timeoutWorkflow": {
+            "type": "boolean",
+            "description": "Enables setting a duration after which workflow is canceled",
+            "default": false
+          },
+          "timeoutAfter": {
+            "type": "string",
+            "description": "Duration after which workflow should timeout (e.g., '1h', '30m', '45s')"
+          }
+        }
+      },
+      "workflowMeta": {
+        "type": "object",
+        "description": "Additional metadata about the workflow",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Workflow ID (often mirrors top-level id)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Workflow name (often mirrors top-level name)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the workflow"
+          },
+          "version": {
+            "type": "string",
+            "description": "Semantic versioning of the workflow"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Categorization tags for the workflow",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }

@@ -25,6 +25,11 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
       "pinData",
       "staticData",
       "tags",
+      "active",
+      "id",
+      "triggerCount",
+      "createdAt",
+      "updatedAt",
     ];
     
     // Initialize the clean workflow with required fields
@@ -49,6 +54,21 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
     }
     if (workflow.tags !== undefined) {
       cleanWorkflow.tags = Array.isArray(workflow.tags) ? [...workflow.tags] : [];
+    }
+    if (workflow.active !== undefined) {
+      cleanWorkflow.active = Boolean(workflow.active);
+    }
+    if (workflow.id !== undefined) {
+      cleanWorkflow.id = workflow.id;
+    }
+    if (workflow.triggerCount !== undefined) {
+      cleanWorkflow.triggerCount = Number(workflow.triggerCount) || 0;
+    }
+    if (workflow.createdAt !== undefined) {
+      cleanWorkflow.createdAt = workflow.createdAt;
+    }
+    if (workflow.updatedAt !== undefined) {
+      cleanWorkflow.updatedAt = workflow.updatedAt;
     }
     
     // Double-check: remove any fields that might have snuck in
@@ -159,6 +179,7 @@ export async function POST(req) {
     const claudeResponse = await anthropicClient.generateWorkflow(
       optimizedPrompt,
       {
+        model: "claude-3-7-sonnet-20250219", // Use the specified model
         platform,
         complexity,
         temperature: 0.1,
@@ -263,6 +284,11 @@ export async function POST(req) {
       if (cleanedWorkflow.pinData) importReadyWorkflow.pinData = cleanedWorkflow.pinData;
       if (cleanedWorkflow.staticData !== undefined) importReadyWorkflow.staticData = cleanedWorkflow.staticData;
       if (cleanedWorkflow.tags && cleanedWorkflow.tags.length > 0) importReadyWorkflow.tags = cleanedWorkflow.tags;
+      if (cleanedWorkflow.active !== undefined) importReadyWorkflow.active = cleanedWorkflow.active;
+      if (cleanedWorkflow.id) importReadyWorkflow.id = cleanedWorkflow.id;
+      if (cleanedWorkflow.triggerCount !== undefined) importReadyWorkflow.triggerCount = cleanedWorkflow.triggerCount;
+      if (cleanedWorkflow.createdAt) importReadyWorkflow.createdAt = cleanedWorkflow.createdAt;
+      if (cleanedWorkflow.updatedAt) importReadyWorkflow.updatedAt = cleanedWorkflow.updatedAt;
       
       // Set directly as a string to avoid any chance of mutation
       response.copyableJSON = JSON.stringify(importReadyWorkflow, null, 2);

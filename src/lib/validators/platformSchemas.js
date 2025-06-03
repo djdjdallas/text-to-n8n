@@ -1,7 +1,14 @@
 // src/lib/validators/platformSchemas.js
+import n8nSchema from "@/lib/ai/schemas/n8n.schema.json";
+
+// Import the n8n workflow schema from docs
+const n8nWorkflowSchema = require("/Users/dominickhill/ai-automation/docs/n8n/schemas/workflow-schema.json");
+
 export const platformSchemas = {
   n8n: {
-    workflow: {
+    workflow: n8nWorkflowSchema,
+    // Keep the original schema as a fallback
+    workflowLegacy: {
       type: "object",
       required: ["name", "nodes", "connections", "settings"],
       properties: {

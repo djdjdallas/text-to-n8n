@@ -69,10 +69,6 @@ export class WorkflowFormatFixer {
         if (node.type === "n8n-nodes-base.googleDriveTrigger") {
           this.fixGoogleDriveTrigger(node);
         }
-        // Fix Google Drive nodes
-        if (node.type === "n8n-nodes-base.googleDrive") {
-          this.fixGoogleDriveNode(node);
-        }
 
         // Fix HTTP Request nodes
         if (node.type === "n8n-nodes-base.httpRequest") {
@@ -127,81 +123,6 @@ export class WorkflowFormatFixer {
     delete fixed._metadata;
 
     return fixed;
-  }
-
-  fixGoogleDriveNode(node) {
-    if (!node.parameters) node.parameters = {};
-
-    // Fix list/search operations
-    if (
-      node.parameters.operation === "list" &&
-      node.parameters.resource === "folder"
-    ) {
-      // Remove invalid 'name' parameter at root level
-      if (node.parameters.name) {
-        delete node.parameters.name;
-      }
-
-      // Ensure search query is in the right place
-      if (!node.parameters.queryString && node.parameters.options?.q) {
-        node.parameters.queryString = node.parameters.options.q;
-        delete node.parameters.options.q;
-      }
-
-      // For folder search, it should use 'search' operation
-      node.parameters.operation = "search";
-      node.parameters.searchMethod = "name";
-      node.parameters.searchText = "Invoices 2025";
-
-      // Remove options if empty
-      if (
-        node.parameters.options &&
-        Object.keys(node.parameters.options).length === 0
-      ) {
-        delete node.parameters.options;
-      }
-    }
-
-    // Fix upload operations
-    if (
-      node.parameters.operation === "upload" &&
-      node.parameters.resource === "file"
-    ) {
-      // Fix binary data reference
-      if (node.parameters.binary) {
-        delete node.parameters.binary;
-        // Set the correct binary property name
-        node.parameters.binaryPropertyName = "data";
-      }
-
-      // Fix folder ID reference
-      if (
-        node.parameters.folderId &&
-        typeof node.parameters.folderId === "string"
-      ) {
-        // Ensure it's using proper expression
-        if (node.parameters.folderId.includes("getFolderID")) {
-          node.parameters.parents = {
-            __rl: true,
-            value: node.parameters.folderId,
-            mode: "id",
-          };
-          delete node.parameters.folderId;
-        }
-      }
-    }
-
-    // Fix create folder operations
-    if (
-      node.parameters.operation === "create" &&
-      node.parameters.resource === "folder"
-    ) {
-      // Ensure proper structure
-      if (!node.parameters.name && node.parameters.folderName) {
-        node.parameters.name = node.parameters.folderName;
-        delete node.parameters.folderName;
-      }
-    }
   }
 
   /**

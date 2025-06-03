@@ -7,12 +7,6 @@ import { PLATFORMS, COMPLEXITY_LEVELS } from "@/lib/constants";
 export class ClaudePromptOptimizer {
   constructor() {
     this.modelCapabilities = {
-      "claude-3-7-sonnet-20250219": {
-        maxTokens: 8192,
-        strengthJSON: 0.98,
-        strengthLogic: 0.98,
-        strengthCreativity: 0.9,
-      },
       "claude-3-5-sonnet-20241022": {
         maxTokens: 8192,
         strengthJSON: 0.95,
@@ -52,7 +46,7 @@ export class ClaudePromptOptimizer {
     
 Your output MUST be a valid ${platform} workflow JSON containing ONLY these fields:
 - name, nodes, connections, settings, meta (REQUIRED)
-- versionId, pinData, staticData, tags, active (OPTIONAL)
+- versionId, pinData, staticData, tags (OPTIONAL)
 
 ❌ STRICTLY FORBIDDEN: Never include _metadata or any underscore-prefixed fields!
 These will cause the workflow to fail when imported into ${platform}.`);
@@ -86,7 +80,7 @@ These will cause the workflow to fail when imported into ${platform}.`);
     sections.push(`## 🚨 FINAL REMINDER - VALIDATE BEFORE SUBMITTING
     
 BEFORE submitting your response, verify your workflow JSON contains ONLY these fields:
-- name, nodes, connections, settings, meta, [versionId], [pinData], [staticData], [tags], [active], [id], [triggerCount], [createdAt], [updatedAt]
+- name, nodes, connections, settings, meta, [versionId], [pinData], [staticData], [tags]
 
 ❌ REMOVE ALL non-standard fields, especially:
 - _metadata (WILL CAUSE IMPORT FAILURE)
@@ -312,8 +306,7 @@ Based on ${platform} documentation, here are the relevant components and pattern
    - Google Drive node (upload binary data)
    
 Binary data reference: {{$binary.data}} 
-
-GOOGLE DRIVE NODE:
+``GOOGLE DRIVE NODE:
   - For folder search use:
     "parameters": {
       "operation": "search",
@@ -467,11 +460,6 @@ Your output MUST be a valid ${platform} workflow JSON containing ONLY these fiel
 - pinData (Object)
 - staticData (null or Object)
 - tags (Array)
-- active (Boolean)
-- id (String)
-- triggerCount (Number)
-- createdAt (String - ISO date)
-- updatedAt (String - ISO date)
 
 ❌ STRICTLY FORBIDDEN FIELDS (NEVER include):
 - _metadata (WILL CAUSE IMPORT FAILURE)
@@ -484,7 +472,7 @@ Your output MUST be a valid ${platform} workflow JSON containing ONLY these fiel
 You MUST verify your final output contains ONLY standard fields before responding.
 
 FINAL VALIDATION: Before submitting, verify your JSON contains ONLY these top-level fields:
-name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, id, triggerCount, createdAt, updatedAt
+name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
 NO OTHER FIELDS ARE ALLOWED!`;
   }
 
@@ -528,11 +516,6 @@ NO OTHER FIELDS ARE ALLOWED!`;
   - pinData (optional) - Object
   - staticData (optional) - Object or null
   - tags (optional) - Array
-  - active (optional) - Boolean
-  - id (optional) - String
-  - triggerCount (optional) - Number
-  - createdAt (optional) - String (ISO date)
-  - updatedAt (optional) - String (ISO date)
   
   ❌ STRICTLY FORBIDDEN FIELDS (NEVER include these or the workflow will BREAK):
   - _metadata (STRICTLY FORBIDDEN) - Will cause import failure
@@ -568,7 +551,7 @@ NO OTHER FIELDS ARE ALLOWED!`;
   4. Did I include ONLY standard n8n fields?
   
   FINAL CHECK: Before responding, manually verify your JSON contains ONLY these fields:
-  name, nodes, connections, settings, meta, [versionId], [pinData], [staticData], [tags], [active], [id], [triggerCount], [createdAt], [updatedAt]
+  name, nodes, connections, settings, meta, [versionId], [pinData], [staticData], [tags]
   NO OTHER FIELDS ARE ALLOWED!`;
   }
   /**
@@ -705,8 +688,8 @@ NO OTHER FIELDS ARE ALLOWED!`;
    * Calculate optimal model for complexity
    */
   getOptimalModel(complexity) {
-    // Always use Claude 3.7 Sonnet for best JSON generation
-    return "claude-3-7-sonnet-20250219";
+    // Always use Sonnet for accuracy in JSON generation
+    return "claude-3-5-sonnet-20241022";
   }
 }
 

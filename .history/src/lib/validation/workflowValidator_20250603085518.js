@@ -12,13 +12,6 @@ export class WorkflowValidator {
       [PLATFORMS.ZAPIER]: new ZapierValidator(),
       [PLATFORMS.MAKE]: new MakeValidator(),
     };
-    
-    // Import the schema directly from the documentation
-    this.schemas = {
-      [PLATFORMS.N8N]: platformSchemas.n8n.workflow,
-      [PLATFORMS.ZAPIER]: platformSchemas.zapier.zap,
-      [PLATFORMS.MAKE]: platformSchemas.make.scenario,
-    };
   }
 
   /**
@@ -222,43 +215,24 @@ class BaseValidator {
  */
 class N8NValidator extends BaseValidator {
   validateSchema(workflow) {
-    const schema = platformSchemas.n8n.workflow;
-    
-    // Check required fields from schema
-    if (schema.required) {
-      for (const field of schema.required) {
-        if (!workflow[field]) {
-          this.addError(
-            "MISSING_FIELD",
-            `Missing required field: ${field}`,
-            { field },
-            "critical"
-          );
-          return false;
-        }
+    // Check required fields
+    const requiredFields = ["nodes", "connections"];
+    for (const field of requiredFields) {
+      if (!workflow[field]) {
+        this.addError(
+          "MISSING_FIELD",
+          `Missing required field: ${field}`,
+          { field },
+          "critical"
+        );
+        return false;
       }
     }
 
-    // Validate nodes array using schema definition
+    // Validate nodes array
     if (!Array.isArray(workflow.nodes) || workflow.nodes.length === 0) {
       this.addError("INVALID_NODES", "Nodes must be a non-empty array");
       return false;
-    }
-
-    // Validate node items against schema
-    for (const node of workflow.nodes) {
-      if (schema.definitions?.node?.required) {
-        for (const requiredProp of schema.definitions.node.required) {
-          if (!node[requiredProp]) {
-            this.addError(
-              "INVALID_NODE_STRUCTURE",
-              `Node missing required property: ${requiredProp}`,
-              { node: node.name || "unnamed" }
-            );
-            return false;
-          }
-        }
-      }
     }
 
     // Validate connections object
