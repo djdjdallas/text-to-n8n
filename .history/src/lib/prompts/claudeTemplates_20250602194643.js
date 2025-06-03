@@ -182,127 +182,50 @@ Based on ${platform} documentation, here are the relevant components and pattern
   buildTechnicalSpecs(platform, options) {
     const specs = {
       [PLATFORMS.N8N]: `### n8n Technical Specifications:
-  CRITICAL FORMAT REQUIREMENTS:
-  
-  1. GMAIL TRIGGER NODE:
-     - labelIds must be an array at the root level: parameters.labelIds = ["INBOX"]
-     - Do NOT put labelIds inside an options object
-     - Remove any 'scope' parameter - it's not valid
-     - Example:
-       "parameters": {
-         "labelIds": ["INBOX"],
-         "includeAttachments": false
-       }
-  
-  2. SLACK NODE:
-     - Must have typeVersion: 2.2
-     - Must have operation: "post" 
-     - Must have authentication: "accessToken"
-     - Do NOT include 'resource' parameter
-     - Channel should start with # (e.g., "#general")
-     - Include credentials object
-     - Example:
-       "parameters": {
-         "operation": "post",
-         "authentication": "accessToken", 
-         "channel": "#general",
-         "text": "Your message here",
-         "otherOptions": {}
-       }
-  
-  3. IF NODE CONDITIONS:
-     - Must have conditions.conditions array structure
-     - Each condition must have: leftValue, rightValue, operation
-     - leftValue should use expressions: "={{$json[\\"field\\"]}}"
-     - Do NOT leave leftValue or rightValue empty
-     - Do NOT include 'combinator' field
-     - Example:
-       "parameters": {
-         "conditions": {
-           "conditions": [{
-             "leftValue": "={{$json[\\"from\\"]}}",
-             "rightValue": "vip@company.com",
-             "operation": "contains"
-           }]
-         },
-         "combineOperation": "all"
-       }
-  
-  4. GOOGLE SHEETS NODE:
-     - Do NOT use __rl wrapper objects
-     - documentId and sheetName should be simple strings
-     - columns.value should be a simple object, not mappingValues array
-     - Example:
-       "parameters": {
-         "operation": "append",
-         "documentId": "YOUR_SHEET_ID",
-         "sheetName": "Sheet1",
-         "columns": {
-           "mappingMode": "defineBelow",
-           "value": {
-             "Timestamp": "={{new Date().toISOString()}}",
-             "From": "={{$json[\\"from\\"]}}"
-           }
-         }
-       }
-  
-  5. ALL NODES:
-     - Must have unique id (lowercase alphanumeric, 6+ chars)
-     - Must have position array: [x, y]
-     - Must include credentials object for nodes that need auth
-     - Node names must match exactly in connections
-     - Each node must have: id (string), name (string), type (string), typeVersion (number), position ([x,y])
-  
-  6. CONNECTIONS:
-     - Format: { "NodeName": { "main": [[{ "node": "TargetNode", "type": "main", "index": 0 }]] }}
-     - main must be array of arrays
-     - Each connection must have: node, type, index
-  
-  7. WORKFLOW STRUCTURE:
-     - Must include: name, nodes, connections, settings, meta
-     - settings must have executionOrder: "v1"
-     - meta must have instanceId
-     - Include versionId, pinData: {}, staticData: null, tags: []
-  
-  8. DATA REFERENCES:
-     - Use expressions: {{$node["NodeName"].json.fieldName}}
-     - For current node data: {{$json["fieldName"]}}
-     - Credentials referenced by name only
-     - Boolean values must be actual booleans, not strings`,
+- Each node must have: id (string), name (string), type (string), typeVersion (number), position ([x,y])
+- Connections format: { "NodeName": { "main": [[{ "node": "TargetNode", "type": "main", "index": 0 }]] }}
+- Data references: {{$node["NodeName"].json.fieldName}}
+- Credentials referenced by name only
+- Boolean values must be actual booleans, not strings
+- All node names must be unique
+CRITICAL FORMAT RULES:
+  - Schedule trigger intervals MUST be arrays: interval: [1] not interval: 1
+  - IF node conditions MUST be wrapped in conditions object with array:
+    conditions: { conditions: [{leftValue, rightValue, operation}] }
+  - Google Drive folder IDs must be strings, not objects
+  - All multi-value parameters must be arrays even with single values
+  - Webhook paths must not contain spaces (use hyphens)
+  - Email parameters must have fromEmail field`,
 
       [PLATFORMS.ZAPIER]: `### Zapier Technical Specifications:
-  - Trigger must be first, followed by actions array
-  - Each step needs: app (string), event/action (string), configuration (object)
-  - Field references: {{trigger.fieldName}} or {{stepName.fieldName}}
-  - Filters use standard comparison operators
-  - Dynamic fields should use proper field mapping`,
+- Trigger must be first, followed by actions array
+- Each step needs: app (string), event/action (string), configuration (object)
+- Field references: {{trigger.fieldName}} or {{stepName.fieldName}}
+- Filters use standard comparison operators
+- Dynamic fields should use proper field mapping`,
 
       [PLATFORMS.MAKE]: `### Make Technical Specifications:
-  - Modules need: id (number), module (string), version (number), parameters (object)
-  - Data mapping format: {{moduleId.fieldName}}
-  - Connections array defines flow between modules
-  - Routers and filters use advanced conditional logic
-  - Each module must have unique numeric ID`,
+- Modules need: id (number), module (string), version (number), parameters (object)
+- Data mapping format: {{moduleId.fieldName}}
+- Connections array defines flow between modules
+- Routers and filters use advanced conditional logic
+- Each module must have unique numeric ID`,
     };
 
     let spec = specs[platform] || specs[PLATFORMS.N8N];
 
     // Add error handling specs if enabled
     if (options.errorHandling) {
-      spec += `\n
-  9. ERROR HANDLING:
-     - Include error handling nodes/steps
-     - Add validation for critical operations
-     - Implement retry logic where appropriate`;
+      spec += `\n- Include error handling nodes/steps
+- Add validation for critical operations
+- Implement retry logic where appropriate`;
     }
 
     // Add optimization specs
     if (options.optimization > 50) {
-      spec += `\n
-  10. OPTIMIZATION:
-     - Optimize for performance (parallel execution where possible)
-     - Minimize API calls through batching
-     - Use efficient data transformations`;
+      spec += `\n- Optimize for performance (parallel execution where possible)
+- Minimize API calls through batching
+- Use efficient data transformations`;
     }
 
     return spec;
@@ -561,6 +484,89 @@ Your entire response must be parseable by JSON.parse().`;
     return "claude-3-5-sonnet-20241022";
   }
 }
+// Add this to your claudeTemplates.js buildTechnicalSpecs method
+
+const n8nTechnicalSpecs = `### n8n Technical Specifications:
+CRITICAL FORMAT REQUIREMENTS:
+
+1. GMAIL TRIGGER NODE:
+   - labelIds must be an array at the root level: parameters.labelIds = ["INBOX"]
+   - Do NOT put labelIds inside an options object
+   - Remove any 'scope' parameter - it's not valid
+   - Example:
+     "parameters": {
+       "labelIds": ["INBOX"],
+       "includeAttachments": false
+     }
+
+2. SLACK NODE:
+   - Must have typeVersion: 2.2
+   - Must have operation: "post" 
+   - Must have authentication: "accessToken"
+   - Do NOT include 'resource' parameter
+   - Channel should start with # (e.g., "#general")
+   - Include credentials object
+   - Example:
+     "parameters": {
+       "operation": "post",
+       "authentication": "accessToken", 
+       "channel": "#general",
+       "text": "Your message here",
+       "otherOptions": {}
+     }
+
+3. IF NODE CONDITIONS:
+   - Must have conditions.conditions array structure
+   - Each condition must have: leftValue, rightValue, operation
+   - leftValue should use expressions: "={{$json[\\"field\\"]}}"
+   - Do NOT leave leftValue or rightValue empty
+   - Do NOT include 'combinator' field
+   - Example:
+     "parameters": {
+       "conditions": {
+         "conditions": [{
+           "leftValue": "={{$json[\\"from\\"]}}",
+           "rightValue": "vip@company.com",
+           "operation": "contains"
+         }]
+       },
+       "combineOperation": "all"
+     }
+
+4. GOOGLE SHEETS NODE:
+   - Do NOT use __rl wrapper objects
+   - documentId and sheetName should be simple strings
+   - columns.value should be a simple object, not mappingValues array
+   - Example:
+     "parameters": {
+       "operation": "append",
+       "documentId": "YOUR_SHEET_ID",
+       "sheetName": "Sheet1",
+       "columns": {
+         "mappingMode": "defineBelow",
+         "value": {
+           "Timestamp": "={{new Date().toISOString()}}",
+           "From": "={{$json[\\"from\\"]}}"
+         }
+       }
+     }
+
+5. ALL NODES:
+   - Must have unique id (lowercase alphanumeric, 6+ chars)
+   - Must have position array: [x, y]
+   - Must include credentials object for nodes that need auth
+   - Node names must match exactly in connections
+
+6. CONNECTIONS:
+   - Format: { "NodeName": { "main": [[{ "node": "TargetNode", "type": "main", "index": 0 }]] }}
+   - main must be array of arrays
+   - Each connection must have: node, type, index
+
+7. WORKFLOW STRUCTURE:
+   - Must include: name, nodes, connections, settings, meta
+   - settings must have executionOrder: "v1"
+   - meta must have instanceId
+   - Include versionId, pinData: {}, staticData: null, tags: []`;
 
 // Export singleton instance
 export const claudeOptimizer = new ClaudePromptOptimizer();
