@@ -2,7 +2,7 @@
 import { OpenAI } from "openai";
 // import { validateWorkflowSchema } from "./validators";
 import { validateWorkflowStructure } from "../validators/requestValidator";
-// import { getRelevantDocs } from "./ragSystem";
+import { getRelevantDocs } from "./ragSystem";
 
 export class WorkflowGenerator {
   constructor() {
@@ -17,9 +17,7 @@ export class WorkflowGenerator {
       const understanding = await this.parseIntent(input, platform);
 
       // Step 2: Retrieve relevant documentation
-      const { RAGSystem } = await import("../rag/ragSystem.js");
-      const ragSystem = new RAGSystem();
-      const relevantDocs = await ragSystem.getRelevantDocs(understanding, platform);
+      const relevantDocs = await getRelevantDocs(understanding, platform);
 
       // Step 3: Plan the workflow structure
       const workflowPlan = await this.planWorkflow(
@@ -112,27 +110,11 @@ export class WorkflowGenerator {
   }
 
   async generateJson(plan, platform, relevantDocs) {
-    // Import schemas from local files
-    let schemas;
-    try {
-      const n8nSchema = await import("./schemas/n8n.schema.json");
-      const zapierSchema = await import("./schemas/zapier.schema.json");
-      const makeSchema = await import("./schemas/make.schema.json");
-      
-      schemas = {
-        n8n: n8nSchema.default,
-        zapier: zapierSchema.default,
-        make: makeSchema.default,
-      };
-    } catch (error) {
-      console.error("Error loading schema files:", error);
-      // Fallback to empty schemas if files can't be loaded
-      schemas = {
-        n8n: {},
-        zapier: {},
-        make: {}
-      };
-    }
+    const schemas = {
+      n8n: await import("./schemas/n8n.schema.json"),
+      zapier: await import("./schemas/zapier.schema.json"),
+      make: await import("./schemas/make.schema.json"),
+    };
 
     const platformSchema = schemas[platform];
     const docsContext = relevantDocs.map((doc) => doc.content).join("\n\n");

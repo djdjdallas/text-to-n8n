@@ -1,7 +1,7 @@
 // src/lib/rag/documentationStore.js
 import { createClient } from "@supabase/supabase-js";
-import { OpenAIEmbeddings } from "@langchain/openai";
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
+import { OpenAIEmbeddings } from "langchain/embeddings/openai";
+import { SupabaseVectorStore } from "langchain/vectorstores/supabase";
 
 export class DocumentationStore {
   constructor() {
@@ -67,18 +67,5 @@ export class DocumentationStore {
         metadata: doc.metadata,
         score,
       }));
-  }
-}
-
-// Export a class for vector store operations
-export class VectorStore {
-  constructor() {
-    this.store = new DocumentationStore();
-  }
-
-  async searchSimilar(query, platform, options = {}) {
-    const { limit = 10, threshold = 0.7 } = options;
-    const results = await this.store.queryRelevantDocs(query, platform, limit);
-    return results.filter(doc => doc.score > threshold);
   }
 }

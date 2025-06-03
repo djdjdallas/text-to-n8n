@@ -1,5 +1,5 @@
 // src/app/api/test/vector-search/route.js
-import { VectorStore } from "@/lib/database/vectorStore";
+import { VectorStore } from "@/lib/rag/documentationStore";
 import { NextResponse } from "next/server";
 
 export async function POST(req) {

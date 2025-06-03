@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["nodes", "connections"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the workflow"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "type", "parameters", "position"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the node"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the node"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of node (trigger, action, etc.)"
+          },
+          "parameters": {
+            "type": "object",
+            "description": "Configuration parameters for the node"
+          },
+          "position": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 2,
+            "maxItems": 2,
+            "description": "X and Y coordinates for node positioning"
+          },
+          "typeVersion": {
+            "type": "number",
+            "description": "Version of the node type"
+          },
+          "credentials": {
+            "type": "object",
+            "description": "Credential configuration for the node"
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "object",
+      "description": "Connections between nodes",
+      "patternProperties": {
+        "^.*$": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["node", "type", "index"],
+            "properties": {
+              "node": {
+                "type": "string",
+                "description": "ID of the node to connect to"
+              },
+              "type": {
+                "type": "string",
+                "description": "Type of connection"
+              },
+              "index": {
+                "type": "number",
+                "description": "Index of the connection point"
+              }
+            }
+          }
+        }
+      }
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the workflow is active"
+    },
+    "settings": {
+      "type": "object",
+      "description": "Workflow settings"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags associated with the workflow"
+    }
+  }
+}

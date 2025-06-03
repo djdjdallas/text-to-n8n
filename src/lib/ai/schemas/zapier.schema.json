@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["steps"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Title of the Zap"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the Zap"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "app", "type", "params"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the step"
+          },
+          "app": {
+            "type": "string",
+            "description": "App identifier"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["trigger", "action", "search", "filter"],
+            "description": "Type of step"
+          },
+          "params": {
+            "type": "object",
+            "description": "Configuration parameters for the step"
+          },
+          "mapping": {
+            "type": "object",
+            "description": "Mapping configuration for data transfer between steps"
+          },
+          "skip_if": {
+            "type": "object",
+            "description": "Conditional logic for skipping step"
+          },
+          "input_format": {
+            "type": "string",
+            "description": "Format of input data"
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "ID of the source step"
+          },
+          "to": {
+            "type": "string",
+            "description": "ID of the target step"
+          }
+        }
+      }
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the Zap is active"
+    },
+    "folder": {
+      "type": "string",
+      "description": "Folder to organize the Zap"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags associated with the Zap"
+    }
+  }
+}
