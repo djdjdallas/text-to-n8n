@@ -1,11 +1,52 @@
 // src/lib/workflow/formatFixer.js
 export class WorkflowFormatFixer {
   /**
+   * Remove NoOp nodes entirely
+   */
+  removeNoOpNodes(workflow) {
+    if (!workflow.nodes) return;
+    
+    // Find all NoOp nodes
+    const noOpNodes = workflow.nodes.filter(n => n.type === 'n8n-nodes-base.noOp');
+    const noOpNodeNames = noOpNodes.map(n => n.name);
+    
+    // If no NoOp nodes, return early
+    if (noOpNodeNames.length === 0) return;
+    
+    // Remove NoOp nodes from the nodes array
+    workflow.nodes = workflow.nodes.filter(n => n.type !== 'n8n-nodes-base.noOp');
+    
+    // Remove connections to/from NoOp nodes
+    if (workflow.connections) {
+      Object.keys(workflow.connections).forEach(sourceName => {
+        if (noOpNodeNames.includes(sourceName)) {
+          // Remove this connection entirely
+          delete workflow.connections[sourceName];
+        } else {
+          // Remove connections TO NoOp nodes
+          const connection = workflow.connections[sourceName];
+          if (connection.main) {
+            connection.main = connection.main.map(output => {
+              if (Array.isArray(output)) {
+                return output.filter(conn => !noOpNodeNames.includes(conn.node));
+              }
+              return output;
+            });
+          }
+        }
+      });
+    }
+  }
+
+  /**
    * Fix n8n workflow format issues
    */
   fixN8nWorkflow(workflow) {
     // Create a copy to avoid mutations
     const fixed = JSON.parse(JSON.stringify(workflow));
+
+    // 0. Remove NoOp nodes before processing
+    this.removeNoOpNodes(fixed);
 
     // 1. Add meta field if missing
     if (!fixed.meta) {
@@ -83,6 +124,11 @@ export class WorkflowFormatFixer {
         if (node.type === "n8n-nodes-base.webhook") {
           this.fixWebhookNode(node);
         }
+        
+        // Fix RespondToWebhook nodes
+        if (node.type === "n8n-nodes-base.respondToWebhook") {
+          this.fixRespondToWebhookNode(node);
+        }
 
         // Fix Email Send nodes
         if (node.type === "n8n-nodes-base.emailSend") {
@@ -95,6 +141,11 @@ export class WorkflowFormatFixer {
           node.type === "n8n-nodes-base.functionItem"
         ) {
           this.fixFunctionNode(node);
+        }
+        
+        // Fix Set nodes
+        if (node.type === "n8n-nodes-base.set") {
+          this.fixSetNode(node);
         }
       });
     }
@@ -385,9 +436,10 @@ export class WorkflowFormatFixer {
       }
     }
 
-    // Ensure otherOptions exists
-    if (!node.parameters.otherOptions) {
-      node.parameters.otherOptions = {};
+    // Fix otherOptions - remove if empty
+    if (node.parameters.otherOptions && 
+        Object.keys(node.parameters.otherOptions).length === 0) {
+      delete node.parameters.otherOptions;
     }
   }
 
@@ -399,6 +451,11 @@ export class WorkflowFormatFixer {
 
     // Handle various condition formats
     if (node.parameters.conditions) {
+      // REMOVE the "number" field if it exists (it's invalid)
+      if (node.parameters.conditions.number) {
+        delete node.parameters.conditions.number;
+      }
+
       // Ensure conditions object structure
       if (!node.parameters.conditions.conditions) {
         if (Array.isArray(node.parameters.conditions)) {
@@ -444,6 +501,11 @@ export class WorkflowFormatFixer {
             if (fixedCondition.leftValue === '={{$json["field"]}}') {
               // Try to infer the correct field from context
               fixedCondition.leftValue = '={{$json["email"]}}'; // Common case
+            }
+            
+            // Handle "exists" operation - it should have empty rightValue
+            if (fixedCondition.operation === 'exists' || fixedCondition.operation === 'notExists') {
+              fixedCondition.rightValue = '';
             }
 
             return fixedCondition;
@@ -496,8 +558,7 @@ export class WorkflowFormatFixer {
 
     // Fix documentId format - remove __rl wrapper
     if (node.parameters.documentId?.__rl) {
-      node.parameters.documentId =
-        node.parameters.documentId.value || "YOUR_SHEET_ID_HERE";
+      node.parameters.documentId = node.parameters.documentId.value || "YOUR_SHEET_ID_HERE";
     }
 
     // Fix sheetName format - remove __rl wrapper
@@ -505,21 +566,22 @@ export class WorkflowFormatFixer {
       node.parameters.sheetName = node.parameters.sheetName.value || "Sheet1";
     }
 
-    // Fix columns structure
+    // Remove or fix options field for getAll operation
+    if (node.parameters.operation === "getAll" && node.parameters.options) {
+      // Either remove it entirely:
+      delete node.parameters.options;
+      // Or ensure it's in the correct format (if options are supported)
+    }
+
+    // Fix columns structure for append operation
     if (node.parameters.columns?.mappingMode === "defineBelow") {
       if (node.parameters.columns.value?.mappingValues) {
-        // Convert mappingValues array to simple object
         const simpleColumns = {};
         node.parameters.columns.value.mappingValues.forEach((mapping) => {
           simpleColumns[mapping.column] = mapping.value;
         });
         node.parameters.columns.value = simpleColumns;
       }
-    }
-
-    // Ensure options exists
-    if (!node.parameters.options) {
-      node.parameters.options = {};
     }
   }
 
@@ -719,6 +781,30 @@ export class WorkflowFormatFixer {
       node.parameters.options = {};
     }
     
+    // Remove invalid options
+    if (node.parameters.options) {
+      const validWebhookOptions = ['responseHeaders', 'rawBody'];
+      const cleanOptions = {};
+      
+      validWebhookOptions.forEach(opt => {
+        if (node.parameters.options[opt] !== undefined) {
+          cleanOptions[opt] = node.parameters.options[opt];
+        }
+      });
+      
+      // Remove invalid responseData option
+      if (node.parameters.options.responseData) {
+        delete node.parameters.options.responseData;
+      }
+      
+      // If options is empty, remove it
+      if (Object.keys(cleanOptions).length === 0) {
+        delete node.parameters.options;
+      } else {
+        node.parameters.options = cleanOptions;
+      }
+    }
+    
     // Remove non-standard webhookId field if it exists at the node level
     if (node.webhookId) {
       delete node.webhookId;
@@ -731,6 +817,42 @@ export class WorkflowFormatFixer {
         delete node[field];
       }
     });
+  }
+  
+  /**
+   * Fix RespondToWebhook node
+   */
+  fixRespondToWebhookNode(node) {
+    if (!node.parameters) node.parameters = {};
+    
+    // Fix responseCode to be a number
+    if (node.parameters.options?.responseCode) {
+      // If it's an expression, set a default
+      if (typeof node.parameters.options.responseCode === 'string' && 
+          node.parameters.options.responseCode.includes('{{')) {
+        // Move to parameters level and set default
+        node.parameters.responseCode = 200;
+        delete node.parameters.options.responseCode;
+      }
+    }
+    
+    // responseCode should be at parameters level, not in options
+    if (node.parameters.options?.responseCode) {
+      node.parameters.responseCode = node.parameters.options.responseCode;
+      delete node.parameters.options.responseCode;
+    }
+    
+    // Ensure responseCode is a number
+    if (node.parameters.responseCode && typeof node.parameters.responseCode === 'string') {
+      if (!node.parameters.responseCode.includes('{{')) {
+        node.parameters.responseCode = parseInt(node.parameters.responseCode, 10) || 200;
+      }
+    }
+    
+    // Clean up empty options
+    if (node.parameters.options && Object.keys(node.parameters.options).length === 0) {
+      delete node.parameters.options;
+    }
   }
 
   /**
@@ -780,6 +902,40 @@ export class WorkflowFormatFixer {
       node.parameters.functionCode = node.parameters.jsCode;
       delete node.parameters.jsCode;
     }
+  }
+
+  /**
+   * Fix Set node parameters
+   */
+  fixSetNode(node) {
+    if (!node.parameters) node.parameters = {};
+    
+    // Remove keepOnlySet entirely - we won't use it at all
+    if (node.parameters.keepOnlySet !== undefined) {
+      delete node.parameters.keepOnlySet;
+    }
+    
+    // Remove options object entirely
+    if (node.parameters.options) {
+      delete node.parameters.options;
+    }
+    
+    // Ensure values.string is an array
+    if (node.parameters.values && node.parameters.values.string && !Array.isArray(node.parameters.values.string)) {
+      node.parameters.values.string = [node.parameters.values.string];
+    }
+    
+    // Create default values if missing
+    if (!node.parameters.values) {
+      node.parameters.values = {
+        string: [
+          { name: "success", value: "true" }
+        ]
+      };
+    }
+    
+    // Ensure typeVersion is 1 for set nodes
+    node.typeVersion = 1;
   }
 
   /**

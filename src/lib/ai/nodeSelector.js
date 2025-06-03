@@ -156,6 +156,9 @@ export class NodeSelector {
       );
     }
     
+    // NEVER include options or keepOnlySet - they cause problems
+    // NEVER include dotNotation option - it's invalid
+    
     return parameters;
   }
   
@@ -184,14 +187,31 @@ export class NodeSelector {
   static getIfNodeParameters(inputs = {}) {
     const parameters = {
       conditions: {
-        conditions: inputs.conditions || [{
-          leftValue: inputs.field ? `={{$json["${inputs.field}"]}}` : '={{$json["field"]}}',
-          rightValue: inputs.value || '',
-          operation: inputs.operation || 'equal'
-        }]
+        conditions: []
       },
       combineOperation: inputs.combineOperation || 'all'
     };
+    
+    // Handle field existence check
+    if (inputs.checkExistence) {
+      parameters.conditions.conditions.push({
+        leftValue: inputs.field ? `={{$json["${inputs.field}"]}}` : '={{$json["field"]}}',
+        rightValue: '',
+        operation: inputs.isNegated ? 'notExists' : 'exists'
+      });
+    } 
+    // Regular condition check
+    else if (inputs.conditions) {
+      parameters.conditions.conditions = inputs.conditions;
+    } 
+    // Default condition
+    else {
+      parameters.conditions.conditions.push({
+        leftValue: inputs.field ? `={{$json["${inputs.field}"]}}` : '={{$json["field"]}}',
+        rightValue: inputs.value || '',
+        operation: inputs.operation || 'equal'
+      });
+    }
     
     return parameters;
   }

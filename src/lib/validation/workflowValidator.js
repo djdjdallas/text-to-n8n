@@ -320,6 +320,28 @@ class N8NValidator extends BaseValidator {
     this.validateConnections(workflow.connections, nodeMap);
   }
 
+  /**
+   * Fix Set node parameters
+   */
+  fixSetNode(node) {
+    if (!node.parameters) node.parameters = {};
+    
+    // Remove invalid options field
+    if (node.parameters.options) {
+      delete node.parameters.options;
+    }
+    
+    // Ensure typeVersion is 1
+    if (node.typeVersion !== 1) {
+      node.typeVersion = 1;
+    }
+    
+    // Ensure values structure exists
+    if (!node.parameters.values) {
+      node.parameters.values = { string: [] };
+    }
+  }
+
   validateNodeType(node) {
     // Common n8n node patterns
     const validNodePatterns = [
@@ -397,6 +419,27 @@ class N8NValidator extends BaseValidator {
         this.addWarning(
           "SUBOPTIMAL_NODE_CHOICE",
           `Function node "${node.name}" only creates a simple data structure. Consider using Set node instead.`,
+          { node: node.name }
+        );
+      }
+    }
+    
+    // Check for Set node issues
+    if (node.type === "n8n-nodes-base.set") {
+      this.fixSetNode(node);
+      
+      if (node.parameters?.options) {
+        this.addWarning(
+          "INVALID_SET_NODE_OPTIONS",
+          `Set node "${node.name}" has options field which should be removed`,
+          { node: node.name }
+        );
+      }
+      
+      if (node.typeVersion !== 1) {
+        this.addWarning(
+          "INCORRECT_SET_NODE_VERSION",
+          `Set node "${node.name}" should have typeVersion 1`,
           { node: node.name }
         );
       }

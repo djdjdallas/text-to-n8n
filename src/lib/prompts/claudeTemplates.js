@@ -41,7 +41,7 @@ export class ClaudePromptOptimizer {
       complexity = COMPLEXITY_LEVELS.MODERATE,
       errorHandling = true,
       optimization = 50,
-      includeExamples = true,
+      includeExamples = false, // Default to false to prevent example-based errors
     } = options;
 
     // Build structured prompt sections
@@ -52,7 +52,7 @@ export class ClaudePromptOptimizer {
     
 Your output MUST be a valid ${platform} workflow JSON containing ONLY these fields:
 - name, nodes, connections, settings, meta (REQUIRED)
-- versionId, pinData, staticData, tags, active (OPTIONAL)
+- versionId, pinData, staticData, tags, active, id, triggerCount, createdAt, updatedAt (OPTIONAL)
 
 ❌ STRICTLY FORBIDDEN: Never include _metadata or any underscore-prefixed fields!
 These will cause the workflow to fail when imported into ${platform}.`);
@@ -65,10 +65,10 @@ These will cause the workflow to fail when imported into ${platform}.`);
       sections.push(this.buildRAGContext(relevantDocs, platform));
     }
 
-    // 3. Technical specifications
-    sections.push(this.buildTechnicalSpecs(platform, options));
+    // 3. Technical specifications with schema emphasis
+    sections.push(this.buildTechnicalSpecsWithSchema(platform, options));
 
-    // 4. Examples (if enabled)
+    // 4. Examples (if enabled) - we're defaulting to false now
     if (includeExamples) {
       sections.push(this.buildExamples(platform, complexity));
     }
@@ -93,8 +93,14 @@ BEFORE submitting your response, verify your workflow JSON contains ONLY these f
 - instructions (WILL CAUSE IMPORT FAILURE)
 - validation (WILL CAUSE IMPORT FAILURE)
 - Any field starting with underscore "_" (WILL CAUSE IMPORT FAILURE)
+- webhookId (WILL CAUSE IMPORT FAILURE)
 
 Your ENTIRE response must be ONLY the JSON object with ONLY standard fields.`);
+
+    // If we're using the simplified prompt style, use that instead
+    if (options.useSimplifiedPrompt) {
+      return this.buildFocusedPrompt(platform, userInput);
+    }
 
     return sections.join("\n\n");
   }
@@ -207,7 +213,212 @@ Based on ${platform} documentation, here are the relevant components and pattern
   }
 
   /**
-   * Build technical specifications
+   * Build technical specifications with schema emphasis
+   */
+  buildTechnicalSpecsWithSchema(platform, options) {
+    if (platform === PLATFORMS.N8N) {
+      // Add schema reference with emphasis on structure
+      let spec = `### n8n Technical Specifications:
+    
+SCHEMA COMPLIANCE:
+You MUST generate JSON that validates against this exact schema structure:
+- nodes array with objects containing: id, name, type, typeVersion, position, parameters
+- connections object with format: { "NodeName": { "main": [[{ "node": "Target", "type": "main", "index": 0 }]] }}
+- Required top-level fields: name, nodes, connections, settings, meta
+- Optional fields: versionId, pinData, staticData, tags, active, id, triggerCount, createdAt, updatedAt
+
+CRITICAL BUGS TO AVOID:
+
+1. IF NODE CONDITIONS:
+   - NEVER use "number" field in conditions
+   - Use ONLY this structure:
+     "conditions": {
+       "conditions": [{
+         "leftValue": "={{expression}}",
+         "rightValue": "value",
+         "operation": "equal"
+       }]
+     }
+
+2. NOOP NODES:
+   - NEVER use n8n-nodes-base.noOp nodes
+   - They serve no purpose and cause import errors
+   - Use Set node or simply skip to next action
+
+3. WEBHOOK RESPONSE:
+   - For webhook responses, use n8n-nodes-base.respondToWebhook
+   - responseData should be a simple JSON string or expression
+
+4. CHECKING ARRAY LENGTH:
+   - To check if array has items, use:
+     "leftValue": "={{$json.length > 0}}",
+     "rightValue": "{{true}}",
+     "operation": "equal"
+
+CRITICAL FORMAT REQUIREMENTS:
+  
+  1. GMAIL TRIGGER NODE:
+   - labelIds must be an array at root level: parameters.labelIds = ["INBOX"]
+   - DO NOT use label: "INBOX" - this is INCORRECT
+   - includeAttachments: true only provides metadata, not binary data
+   - To filter by subject, use a separate IF node after the trigger
+   - To download attachments, use Gmail node with "getAttachment" operation
+   - CORRECT structure:
+     "parameters": {
+       "labelIds": ["INBOX"],
+       "includeAttachments": true
+     }
+  
+  2. SLACK NODE:
+     - Must have typeVersion: 2.2
+     - Must have operation: "post" 
+     - Must have authentication: "accessToken"
+     - Do NOT include 'resource' parameter
+     - Channel should start with # (e.g., "#general")
+     - Include credentials object
+     - CORRECT structure:
+       "parameters": {
+         "operation": "post",
+         "authentication": "accessToken", 
+         "channel": "#general",
+         "text": "Your message here",
+         "otherOptions": {}
+       }
+  
+  3. IF NODE CONDITIONS:
+     - Must have conditions.conditions array structure
+     - Each condition must have: leftValue, rightValue, operation
+     - leftValue should use expressions: "={{$json[\\"field\\"]}}"
+     - For exists operation, use empty rightValue
+     - Do NOT include 'combinator' field
+     - CORRECT structure:
+       "parameters": {
+         "conditions": {
+           "conditions": [{
+             "leftValue": "={{$json[\\"from\\"]}}",
+             "rightValue": "vip@company.com",
+             "operation": "contains"
+           }]
+         },
+         "combineOperation": "all"
+       }
+  
+  4. GOOGLE SHEETS NODE:
+     - Do NOT use __rl wrapper objects
+     - documentId and sheetName should be simple strings
+     - For "getAll" operation:
+       * Use only these parameters: operation, documentId, sheetName, returnAllMatches
+       * Do NOT include "options" field
+       * returnAllMatches should be boolean (true/false)
+     - For "append" operation:
+       * columns.value should be a simple object, not mappingValues array
+     - Example for getAll:
+       "parameters": {
+         "operation": "getAll",
+         "documentId": "YOUR_SHEET_ID",
+         "sheetName": "Sheet1",
+         "returnAllMatches": true
+       }
+  
+  5. SET NODE:
+     - values.string must be an array of objects with name and value
+     - NEVER include an "options" field in Set node parameters
+     - NEVER include "keepOnlySet" or any other options
+     - Set node typeVersion should be 1, not 2
+     - CORRECT structure:
+       "parameters": {
+         "values": {
+           "string": [
+             {"name": "status", "value": "success"},
+             {"name": "message", "value": "Operation completed"}
+           ]
+         }
+       }
+  
+  6. SWITCH NODE:
+     - Preferred over IF for binary conditions
+     - Must have dataType, value1, rules.rules array
+     - CORRECT structure:
+       "parameters": {
+         "dataType": "string",
+         "value1": "={{$json[\\"fieldName\\"]}}",
+         "rules": {
+           "rules": [{
+             "value2": "value",
+             "operation": "equal"
+           }]
+         },
+         "fallbackOutput": 1
+       }
+  
+  7. WEBHOOK NODE:
+     - Valid options: responseHeaders, rawBody only
+     - Do NOT include responseData in options
+     - Do NOT include webhookId field at node level
+     - CORRECT structure:
+       "parameters": {
+         "httpMethod": "POST",
+         "path": "webhook-path",
+         "responseMode": "onReceived",
+         "options": {
+           "responseHeaders": {}
+         }
+       }
+  
+  8. RESPONDTOWEBHOOK NODE:
+     - responseCode must be a number at parameters level, not in options
+     - Do NOT use expressions for responseCode
+     - CORRECT structure:
+       "parameters": {
+         "responseCode": 200,
+         "responseData": "={{JSON.stringify($json)}}"
+       }
+  
+  9. ALL NODES:
+     - Must have unique id (lowercase alphanumeric, 6+ chars)
+     - Must have position array: [x, y]
+     - Must include credentials object for nodes that need auth
+     - Node names must match exactly in connections
+     - Each node must have: id (string), name (string), type (string), typeVersion (number), position ([x,y])
+  
+  10. CONNECTIONS:
+     - CORRECT format: { "NodeName": { "main": [[{ "node": "TargetNode", "type": "main", "index": 0 }]] }}
+     - main must be array of arrays
+     - Each connection must have: node, type, index
+  
+  11. WORKFLOW STRUCTURE:
+   - Must include ONLY these fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+   - Do NOT include any fields like _metadata, instructions, or validation
+   - settings must have executionOrder: "v1"
+   - meta must have instanceId
+   - Include versionId, pinData: {}, staticData: null, tags: []
+  
+  12. NODE SELECTION RULES:
+     - For simple email validation: Webhook → Switch → Set nodes
+     - AVOID: emailSend for non-email-sending tasks
+     - AVOID: function nodes for simple data creation
+     - AVOID: noOp nodes (they do nothing)
+     - Prefer Switch over IF for binary conditions
+     - Use Set node for data creation instead of function`;
+
+      // Add error handling specs if enabled
+      if (options.errorHandling) {
+        spec += `\n
+  12. ERROR HANDLING:
+     - Include error handling nodes/steps
+     - Add validation for critical operations
+     - Implement retry logic where appropriate`;
+      }
+
+      return spec;
+    } else {
+      // For other platforms, fall back to the original implementation
+      return this.buildTechnicalSpecs(platform, options);
+    }
+  }
+
+  /**
+   * Build technical specifications (original implementation)
    */
   buildTechnicalSpecs(platform, options) {
     const specs = {
@@ -262,8 +473,20 @@ Based on ${platform} documentation, here are the relevant components and pattern
   4. GOOGLE SHEETS NODE:
      - Do NOT use __rl wrapper objects
      - documentId and sheetName should be simple strings
-     - columns.value should be a simple object, not mappingValues array
-     - Example:
+     - For "getAll" operation:
+       * Use only these parameters: operation, documentId, sheetName, returnAllMatches
+       * Do NOT include "options" field
+       * returnAllMatches should be boolean (true/false)
+     - For "append" operation:
+       * columns.value should be a simple object, not mappingValues array
+     - Example for getAll:
+       "parameters": {
+         "operation": "getAll",
+         "documentId": "YOUR_SHEET_ID",
+         "sheetName": "Sheet1",
+         "returnAllMatches": true
+       }
+     - Example for append:
        "parameters": {
          "operation": "append",
          "documentId": "YOUR_SHEET_ID",
@@ -368,7 +591,7 @@ GOOGLE DRIVE NODE:
      - Structure:
        "parameters": {
          "dataType": "string",
-         "value1": "={{$json[\"fieldName\"]}}",
+         "value1": "={{$json[\\"fieldName\"]}}",
          "rules": {
            "rules": [{
              "value2": "",
@@ -384,18 +607,64 @@ GOOGLE DRIVE NODE:
        "parameters": {
          "values": {
            "string": [
-             {"name": "status", "value": "success"},
-             {"name": "message", "value": "Dynamic message here"}
+             {"name": "fieldName", "value": "fieldValue"}
            ]
          }
        }
+     - NEVER include an "options" field in Set node parameters
+     - NEVER include "keepOnlySet" or any other options
+     - Set node typeVersion should be 1, not 2
+     - Keep the structure simple with just values
 
   12. NODE SELECTION RULES:
      - For simple email validation: Webhook → Switch → Set nodes
      - AVOID: emailSend for non-email-sending tasks
      - AVOID: function nodes for simple data creation
      - AVOID: noOp nodes (they do nothing)
-     - Prefer Switch over IF for binary conditions`;
+     - Prefer Switch over IF for binary conditions
+     
+  13. SET NODE STRUCTURE:
+     - NEVER include options field in Set node parameters
+     - NEVER use keepOnlySet or dotNotation options - they cause import failures
+     - Keep Set node simple with only values
+     - Structure:
+       "parameters": {
+         "values": {
+           "string": [
+             {"name": "status", "value": "success"}
+           ]
+         }
+       }
+       
+  14. IF NODE FIELD EXISTENCE CHECK:
+     - To check if field exists, use "exists" operation
+     - Structure:
+       "conditions": {
+         "conditions": [{
+           "leftValue": "={{$json[\\"email\"]}}",
+           "rightValue": "",
+           "operation": "exists"  // or "notExists"
+         }]
+       }
+       
+  15. SET NODE TYPE VERSION:
+     - ALWAYS use typeVersion: 1 for Set nodes
+     - typeVersion: 2 causes validation errors
+       
+  16. WEBHOOK NODE CONFIGURATION:
+     - Valid options: responseHeaders, rawBody
+     - Do NOT include 'responseData' in options
+     - When using responseMode: "responseNode", you MUST use respondToWebhook nodes
+     - When using responseMode: "lastNode", do NOT use respondToWebhook nodes
+
+  17. RESPONDTOWEBHOOK NODE:
+     - responseCode must be a number at parameters level, not in options
+     - Structure:
+       "parameters": {
+         "responseCode": 200,  // NOT in options!
+         "responseData": "={{JSON.stringify($json)}}"
+       }
+     - Do NOT use expressions for responseCode`;
     }
 
     // Add optimization specs
@@ -408,6 +677,51 @@ GOOGLE DRIVE NODE:
     }
 
     return spec;
+  }
+  
+  /**
+   * Build a focused, simplified prompt
+   */
+  buildFocusedPrompt(platform, userInput) {
+    if (platform === PLATFORMS.N8N) {
+      return `Generate a valid n8n workflow JSON for this request: "${userInput}"
+
+CRITICAL REQUIREMENTS:
+1. Output ONLY valid JSON - no text before or after
+2. Use ONLY these top-level fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+3. NEVER include fields starting with underscore (_metadata, etc.)
+4. NEVER include webhookId field
+5. Follow n8n node parameter structures exactly
+
+COMMON GOTCHAS TO AVOID:
+- Gmail trigger: use labelIds: ["INBOX"], not label: "INBOX"
+- Slack node: must have typeVersion: 2.2, operation: "post", authentication: "accessToken"
+- IF node: conditions.conditions must be an array
+- All node IDs must be lowercase alphanumeric strings (6+ chars)
+- Set node: NEVER include options, keepOnlySet, or dotNotation - only use values.string
+- RespondToWebhook: responseCode must be a number at parameters level, not in options
+- Webhook: only valid options are responseHeaders and rawBody
+- Google Sheets: For "getAll" operation, do NOT include "options" field, only use operation, documentId, sheetName, returnAllMatches
+
+CRITICAL BUGS TO AVOID:
+- NEVER use "number" field in IF node conditions
+- NEVER use n8n-nodes-base.noOp nodes - use Set nodes instead
+- NEVER use dotNotation option in Set nodes
+- IF node checking array length: use leftValue: "={{$json.length > 0}}", rightValue: "{{true}}", operation: "equal"
+
+NODE SELECTION RULES:
+- For simple conditions use Switch node, not IF
+- For data creation use Set node, not Function
+- For response data use Set node, not EmailSend
+- For simple email validation: Webhook → Switch → Set nodes
+
+Output pure JSON starting with { and ending with }`;
+    } else {
+      // Fall back to basic prompt for other platforms
+      return `Generate a valid ${platform} workflow JSON for this request: "${userInput}"
+
+Output ONLY valid JSON with no explanatory text. Follow the standard ${platform} format exactly.`;
+    }
   }
 
   /**
@@ -434,7 +748,7 @@ GOOGLE DRIVE NODE:
         }
       },
       "parameters": {
-        "label": "INBOX"
+        "labelIds": ["INBOX"]
       }
     },
     {
