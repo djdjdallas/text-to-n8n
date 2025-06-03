@@ -361,7 +361,41 @@ GOOGLE DRIVE NODE:
   9. ERROR HANDLING:
      - Include error handling nodes/steps
      - Add validation for critical operations
-     - Implement retry logic where appropriate`;
+     - Implement retry logic where appropriate
+     
+  10. SWITCH NODE (PREFERRED FOR SIMPLE CONDITIONS):
+     - Use switch instead of IF for binary conditions
+     - Structure:
+       "parameters": {
+         "dataType": "string",
+         "value1": "={{$json[\"fieldName\"]}}",
+         "rules": {
+           "rules": [{
+             "value2": "",
+             "operation": "notEqual"  // or "equal", "contains", etc.
+           }]
+         },
+         "fallbackOutput": 1  // 0-based index for fallback output
+       }
+
+  11. SET NODE (FOR CREATING RESPONSE DATA):
+     - Use for creating structured responses instead of emailSend/function
+     - Structure:
+       "parameters": {
+         "values": {
+           "string": [
+             {"name": "status", "value": "success"},
+             {"name": "message", "value": "Dynamic message here"}
+           ]
+         }
+       }
+
+  12. NODE SELECTION RULES:
+     - For simple email validation: Webhook → Switch → Set nodes
+     - AVOID: emailSend for non-email-sending tasks
+     - AVOID: function nodes for simple data creation
+     - AVOID: noOp nodes (they do nothing)
+     - Prefer Switch over IF for binary conditions`;
     }
 
     // Add optimization specs
@@ -548,6 +582,9 @@ NO OTHER FIELDS ARE ALLOWED!`;
   - You MUST check your final JSON before submitting and REMOVE ANY FIELD not in the allowed list
   - Double-check there are NO underscore-prefixed fields (_metadata, _instructions, etc.)
   - Double-check there are NO explanation or documentation fields
+  - NO non-standard fields like webhookId in node definitions
+  - Use appropriate node types for the task (SET for data creation, SWITCH for simple conditions)
+  - Prefer simpler nodes when possible (avoid complex nodes for simple tasks)
   
   CRITICAL RULES:
   1. Your ENTIRE response must be ONLY the pure JSON object

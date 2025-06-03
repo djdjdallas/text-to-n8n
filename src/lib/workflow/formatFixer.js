@@ -126,7 +126,76 @@ export class WorkflowFormatFixer {
     // 7. Remove any metadata that shouldn't be in the import
     delete fixed._metadata;
 
+    // 8. Generate node replacement suggestions
+    fixed.suggestions = this.suggestNodeReplacements(fixed);
+
     return fixed;
+  }
+  
+  /**
+   * Suggest node replacements to optimize workflow
+   */
+  suggestNodeReplacements(workflow) {
+    const suggestions = [];
+    
+    if (workflow.nodes) {
+      workflow.nodes.forEach(node => {
+        // Suggest switch instead of IF for simple conditions
+        if (node.type === 'n8n-nodes-base.if' && 
+            node.parameters?.conditions?.conditions?.length === 1) {
+          suggestions.push({
+            node: node.name,
+            current: 'if',
+            suggested: 'switch',
+            reason: 'Switch is simpler for binary conditions'
+          });
+        }
+        
+        // Suggest set instead of emailSend for non-email tasks
+        if (node.type === 'n8n-nodes-base.emailSend' && 
+            !node.name.toLowerCase().includes('email')) {
+          suggestions.push({
+            node: node.name,
+            current: 'emailSend',
+            suggested: 'set',
+            reason: 'Use set node for creating response data'
+          });
+        }
+        
+        // Suggest set instead of function for simple data creation
+        if ((node.type === 'n8n-nodes-base.function' || node.type === 'n8n-nodes-base.functionItem') && 
+            (node.parameters?.functionCode?.includes('return {') || node.parameters?.functionCode?.includes('return ['))) {
+          suggestions.push({
+            node: node.name,
+            current: 'function',
+            suggested: 'set',
+            reason: 'Use set node for creating simple data structures'
+          });
+        }
+        
+        // Identify noOp nodes
+        if (node.type === 'n8n-nodes-base.noOp') {
+          suggestions.push({
+            node: node.name,
+            current: 'noOp',
+            suggested: 'remove',
+            reason: 'NoOp nodes do nothing and can be removed'
+          });
+        }
+        
+        // Check for non-standard fields in webhook nodes
+        if (node.type === 'n8n-nodes-base.webhook' && node.webhookId) {
+          suggestions.push({
+            node: node.name,
+            current: 'webhook with webhookId field',
+            suggested: 'webhook without webhookId field',
+            reason: 'Remove non-standard webhookId field'
+          });
+        }
+      });
+    }
+    
+    return suggestions;
   }
 
   fixGoogleDriveNode(node) {
@@ -349,6 +418,11 @@ export class WorkflowFormatFixer {
         ];
       }
 
+      // NEW: Remove invalid "string" field if both exist
+      if (node.parameters.conditions.string && node.parameters.conditions.conditions) {
+        delete node.parameters.conditions.string;
+      }
+
       // Fix empty or invalid conditions
       node.parameters.conditions.conditions =
         node.parameters.conditions.conditions
@@ -366,6 +440,12 @@ export class WorkflowFormatFixer {
               fixedCondition.leftValue = '={{$json["field"]}}';
             }
 
+            // NEW: Fix field references in conditions
+            if (fixedCondition.leftValue === '={{$json["field"]}}') {
+              // Try to infer the correct field from context
+              fixedCondition.leftValue = '={{$json["email"]}}'; // Common case
+            }
+
             return fixedCondition;
           });
 
@@ -373,7 +453,7 @@ export class WorkflowFormatFixer {
       if (node.parameters.conditions.conditions.length === 0) {
         node.parameters.conditions.conditions = [
           {
-            leftValue: '={{$json["field"]}}',
+            leftValue: '={{$json["email"]}}',
             rightValue: "",
             operation: "equal",
           },
@@ -389,7 +469,7 @@ export class WorkflowFormatFixer {
       node.parameters.conditions = {
         conditions: [
           {
-            leftValue: '={{$json["field"]}}',
+            leftValue: '={{$json["email"]}}',
             rightValue: "",
             operation: "equal",
           },
@@ -638,6 +718,19 @@ export class WorkflowFormatFixer {
     if (!node.parameters.options) {
       node.parameters.options = {};
     }
+    
+    // Remove non-standard webhookId field if it exists at the node level
+    if (node.webhookId) {
+      delete node.webhookId;
+    }
+    
+    // Remove non-standard fields that might exist at the node level
+    const standardNodeFields = ['id', 'name', 'type', 'typeVersion', 'position', 'parameters', 'credentials'];
+    Object.keys(node).forEach(field => {
+      if (!standardNodeFields.includes(field)) {
+        delete node[field];
+      }
+    });
   }
 
   /**

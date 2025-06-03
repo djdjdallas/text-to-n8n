@@ -356,6 +356,73 @@ class N8NValidator extends BaseValidator {
         { node: node.name }
       );
     }
+    
+    // NEW: Warn about inappropriate node usage
+    if (node.type === "n8n-nodes-base.emailSend") {
+      // Check if it's actually sending an email
+      if (!node.parameters?.toEmail || !node.parameters?.subject) {
+        this.addWarning(
+          "INAPPROPRIATE_NODE_TYPE",
+          `EmailSend node "${node.name}" used without email parameters. Consider using Set node instead.`,
+          { node: node.name }
+        );
+      }
+    }
+    
+    if (node.type === "n8n-nodes-base.noOp") {
+      this.addWarning(
+        "UNNECESSARY_NODE",
+        `NoOp node "${node.name}" does nothing. Consider removing it.`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for simple conditions that should use Switch instead of IF
+    if (node.type === "n8n-nodes-base.if" && 
+        node.parameters?.conditions?.conditions?.length === 1) {
+      this.addWarning(
+        "SUBOPTIMAL_NODE_CHOICE",
+        `IF node "${node.name}" has only one condition. Consider using Switch node for better performance.`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for function nodes that just create simple data structures
+    if ((node.type === "n8n-nodes-base.function" || node.type === "n8n-nodes-base.functionItem") && 
+        node.parameters?.functionCode) {
+      const code = node.parameters.functionCode;
+      const simpleReturnStructure = code.includes("return {") && !code.includes("if") && !code.includes("for");
+      
+      if (simpleReturnStructure) {
+        this.addWarning(
+          "SUBOPTIMAL_NODE_CHOICE",
+          `Function node "${node.name}" only creates a simple data structure. Consider using Set node instead.`,
+          { node: node.name }
+        );
+      }
+    }
+    
+    // Check for non-standard fields
+    if (node.type === "n8n-nodes-base.webhook") {
+      const standardNodeFields = ['id', 'name', 'type', 'typeVersion', 'position', 'parameters', 'credentials'];
+      Object.keys(node).forEach(field => {
+        if (!standardNodeFields.includes(field)) {
+          if (field === "webhookId") {
+            this.addError(
+              "NON_STANDARD_FIELD",
+              `Webhook node has non-standard field: ${field}`,
+              { node: node.name, field }
+            );
+          } else {
+            this.addWarning(
+              "NON_STANDARD_FIELD",
+              `Webhook node has unexpected field: ${field}`,
+              { node: node.name, field }
+            );
+          }
+        }
+      });
+    }
   }
 
   validateNodeParameters(node) {
