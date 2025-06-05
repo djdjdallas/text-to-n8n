@@ -100,6 +100,9 @@ export class WorkflowFormatFixer {
    * Fix n8n workflow format issues
    */
   fixN8nWorkflow(workflow) {
+    // Debug logging
+    console.log("🔧 formatFixer.fixN8nWorkflow called!");
+    
     // Create a copy to avoid mutations
     const fixed = JSON.parse(JSON.stringify(workflow));
 
@@ -260,6 +263,9 @@ export class WorkflowFormatFixer {
     // 11. Generate node replacement suggestions
     fixed.suggestions = this.suggestNodeReplacements(fixed);
 
+    // Debug logging to confirm completion
+    console.log("✅ formatFixer.fixN8nWorkflow completed!");
+    
     return fixed;
   }
   
@@ -526,10 +532,9 @@ export class WorkflowFormatFixer {
       node.parameters.blocks = node.parameters.blocks.substring(1);
     }
 
-    // ALWAYS remove otherOptions - whether empty or not
-    if (node.parameters.otherOptions) {
-      delete node.parameters.otherOptions;
-    }
+    // ALWAYS ensure otherOptions exists for Slack nodes (empty object)
+    node.parameters.otherOptions = {};
+    console.log(`✅ Fixed Slack node "${node.name}" - otherOptions added`);
   }
 
   /**

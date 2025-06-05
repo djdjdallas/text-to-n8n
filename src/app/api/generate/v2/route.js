@@ -35,8 +35,9 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
     // Initialize the clean workflow with required fields
     const cleanWorkflow = {
       name: workflow.name || "Generated Workflow",
-      nodes: Array.isArray(workflow.nodes) ? [...workflow.nodes] : [],
-      connections: workflow.connections ? {...workflow.connections} : {},
+      // Deep copy nodes to preserve all parameters and nested objects
+      nodes: Array.isArray(workflow.nodes) ? workflow.nodes.map(node => JSON.parse(JSON.stringify(node))) : [],
+      connections: workflow.connections ? JSON.parse(JSON.stringify(workflow.connections)) : {},
       settings: workflow.settings ? {...workflow.settings} : { executionOrder: "v1" },
       meta: workflow.meta ? {...workflow.meta} : { instanceId: "workflow_instance_id" },
     };
@@ -195,10 +196,20 @@ export async function POST(req) {
     // 5. Fix platform-specific format issues
     if (platform === "n8n") {
       workflow = workflowFixer.fixN8nWorkflow(workflow);
+      console.log("🔍 After workflowFixer: Slack nodes have otherOptions:", 
+        workflow.nodes?.some(n => n.type === 'n8n-nodes-base.slack' && n.parameters?.otherOptions));
+      console.log("🔍 After workflowFixer: Top-level fields:", Object.keys(workflow).join(', '));
     }
 
     // 6. IMPORTANT: Clean the workflow to remove any metadata or non-standard fields
     const cleanedWorkflow = cleanWorkflowForExport(workflow, platform);
+    
+    // Debug logging to verify the cleaning didn't remove critical fixes
+    if (platform === "n8n") {
+      console.log("🔍 After cleaning: Slack nodes have otherOptions:", 
+        cleanedWorkflow.nodes?.some(n => n.type === 'n8n-nodes-base.slack' && n.parameters?.otherOptions));
+      console.log("🔍 After cleaning: Top-level fields:", Object.keys(cleanedWorkflow).join(', '));
+    }
 
     // 7. Validate if requested (use cleaned workflow)
     let validationResult = null;
@@ -271,20 +282,23 @@ export async function POST(req) {
     // EMERGENCY FIX: Create a separate endpoint for copy functionality
     if (platform === "n8n") {
       // Create a completely separate workflow JSON with absolutely nothing but the allowed fields
+      // Using deep copies to ensure all nested properties are preserved
       const importReadyWorkflow = {
         name: cleanedWorkflow.name || "Generated Workflow",
-        nodes: cleanedWorkflow.nodes || [],
-        connections: cleanedWorkflow.connections || {},
-        settings: cleanedWorkflow.settings || { executionOrder: "v1" },
-        meta: cleanedWorkflow.meta || { instanceId: "workflow_instance_id" },
+        nodes: cleanedWorkflow.nodes ? JSON.parse(JSON.stringify(cleanedWorkflow.nodes)) : [],
+        connections: cleanedWorkflow.connections ? JSON.parse(JSON.stringify(cleanedWorkflow.connections)) : {},
+        settings: cleanedWorkflow.settings ? JSON.parse(JSON.stringify(cleanedWorkflow.settings)) : { executionOrder: "v1" },
+        meta: cleanedWorkflow.meta ? JSON.parse(JSON.stringify(cleanedWorkflow.meta)) : { instanceId: "workflow_instance_id" },
       };
       
-      // Only add optional fields if they exist and aren't empty
-      if (cleanedWorkflow.versionId) importReadyWorkflow.versionId = cleanedWorkflow.versionId;
-      if (cleanedWorkflow.pinData) importReadyWorkflow.pinData = cleanedWorkflow.pinData;
-      if (cleanedWorkflow.staticData !== undefined) importReadyWorkflow.staticData = cleanedWorkflow.staticData;
-      if (cleanedWorkflow.tags && cleanedWorkflow.tags.length > 0) importReadyWorkflow.tags = cleanedWorkflow.tags;
-      if (cleanedWorkflow.active !== undefined) importReadyWorkflow.active = cleanedWorkflow.active;
+      // ENSURE these critical fields are ALWAYS included (even with default values)
+      importReadyWorkflow.versionId = cleanedWorkflow.versionId || workflowFixer.generateVersionId();
+      importReadyWorkflow.pinData = cleanedWorkflow.pinData || {};
+      importReadyWorkflow.staticData = cleanedWorkflow.staticData !== undefined ? cleanedWorkflow.staticData : null;
+      importReadyWorkflow.tags = cleanedWorkflow.tags || [];
+      importReadyWorkflow.active = cleanedWorkflow.active !== undefined ? cleanedWorkflow.active : false;
+      
+      // Add these optional fields only if they exist
       if (cleanedWorkflow.id) importReadyWorkflow.id = cleanedWorkflow.id;
       if (cleanedWorkflow.triggerCount !== undefined) importReadyWorkflow.triggerCount = cleanedWorkflow.triggerCount;
       if (cleanedWorkflow.createdAt) importReadyWorkflow.createdAt = cleanedWorkflow.createdAt;
@@ -295,6 +309,9 @@ export async function POST(req) {
       
       // Also provide a direct import endpoint for copying
       response.directImportUrl = `/api/workflow/export/${Date.now()}`;
+      
+      // Final debug log to verify what's being returned
+      console.log("🔄 FINAL WORKFLOW:", JSON.stringify(importReadyWorkflow, null, 2).substring(0, 200) + "...");
     }
 
     return NextResponse.json(response);
