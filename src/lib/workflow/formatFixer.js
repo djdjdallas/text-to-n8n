@@ -106,6 +106,9 @@ export class WorkflowFormatFixer {
     // 0. Remove NoOp nodes before processing
     this.removeNoOpNodes(fixed);
 
+    // 0.5. Fix node type casing issues (gmailtrigger → gmailTrigger)
+    this.fixNodeTypeNames(fixed);
+
     // 1. Add meta field if missing
     if (!fixed.meta) {
       fixed.meta = {
@@ -209,6 +212,11 @@ export class WorkflowFormatFixer {
         // Fix OpenAI nodes
         if (node.type === "n8n-nodes-base.openAi") {
           this.fixOpenAINode(node);
+        }
+        
+        // Fix Filter nodes
+        if (node.type === "n8n-nodes-base.filter") {
+          this.fixFilterNode(node);
         }
       });
     }
@@ -507,6 +515,16 @@ export class WorkflowFormatFixer {
         node.parameters.channel = "#" + node.parameters.channel;
       }
     }
+    
+    // Fix text field - remove "=" prefix if it exists
+    if (node.parameters.text && node.parameters.text.startsWith("=")) {
+      node.parameters.text = node.parameters.text.substring(1);
+    }
+    
+    // Also fix blocks field if it exists and has "=" prefix
+    if (node.parameters.blocks && typeof node.parameters.blocks === 'string' && node.parameters.blocks.startsWith("=")) {
+      node.parameters.blocks = node.parameters.blocks.substring(1);
+    }
 
     // ALWAYS remove otherOptions - whether empty or not
     if (node.parameters.otherOptions) {
@@ -732,6 +750,39 @@ export class WorkflowFormatFixer {
       if (rule.cronTimes && !Array.isArray(rule.cronTimes)) {
         rule.cronTimes = [rule.cronTimes];
       }
+      
+      // Fix weekly schedules with hour and dayOfWeek
+      if (rule.hour !== undefined && rule.dayOfWeek !== undefined) {
+        // Convert hour/dayOfWeek to cron expression
+        const hour = typeof rule.hour === 'number' ? rule.hour : parseInt(rule.hour, 10) || 8;
+        let dayOfWeek = 1; // Default to Monday
+        
+        if (rule.dayOfWeek !== undefined) {
+          if (typeof rule.dayOfWeek === 'string') {
+            // Convert day name to number (0 = Sunday, 1 = Monday, etc.)
+            const dayMap = {
+              'sunday': 0, 'sun': 0,
+              'monday': 1, 'mon': 1,
+              'tuesday': 2, 'tue': 2,
+              'wednesday': 3, 'wed': 3,
+              'thursday': 4, 'thu': 4,
+              'friday': 5, 'fri': 5,
+              'saturday': 6, 'sat': 6
+            };
+            dayOfWeek = dayMap[rule.dayOfWeek.toLowerCase()] || 1;
+          } else if (typeof rule.dayOfWeek === 'number') {
+            dayOfWeek = rule.dayOfWeek;
+          }
+        }
+        
+        // Format cron expression: minute hour * * day-of-week
+        // e.g., "0 8 * * 1" for Monday at 8 AM
+        node.parameters.cronExpression = `0 ${hour} * * ${dayOfWeek}`;
+        node.parameters.mode = "cronExpression";
+        
+        // Remove rule structure since we're using cron
+        delete node.parameters.rule;
+      }
     }
 
     // If mode is not set, try to infer it
@@ -741,6 +792,16 @@ export class WorkflowFormatFixer {
       } else if (node.parameters.rule) {
         node.parameters.mode = "everyX";
       }
+    }
+    
+    // Handle cron expression for weekly schedules if specified directly
+    if (node.parameters.mode === "cronExpression" && !node.parameters.cronExpression) {
+      node.parameters.cronExpression = "0 8 * * 1"; // Default to Monday 8 AM
+    }
+    
+    // Ensure we have a valid typeVersion
+    if (!node.typeVersion || node.typeVersion < 1) {
+      node.typeVersion = 1;
     }
   }
 
@@ -961,6 +1022,37 @@ export class WorkflowFormatFixer {
       }
     }
     
+    // Fix complex responseData structure - convert to simple format
+    if (node.parameters.responseData && 
+        typeof node.parameters.responseData === 'string' && 
+        node.parameters.responseData.includes('JSON.stringify')) {
+      
+      // Set up standard response structure
+      node.parameters.respondWith = "json";
+      node.parameters.responseCode = node.parameters.responseCode || 200;
+      
+      // Create simple options structure if needed
+      if (!node.parameters.options) {
+        node.parameters.options = {};
+      }
+      
+      // Set responseData to simple format
+      node.parameters.options.responseData = "firstEntryJson";
+      
+      // Remove old complex responseData
+      delete node.parameters.responseData;
+    }
+    
+    // Always ensure we have proper respondWith value
+    if (!node.parameters.respondWith) {
+      node.parameters.respondWith = "json";
+    }
+    
+    // Always ensure we have proper responseCode
+    if (!node.parameters.responseCode) {
+      node.parameters.responseCode = 200;
+    }
+    
     // Clean up empty options
     if (node.parameters.options && Object.keys(node.parameters.options).length === 0) {
       delete node.parameters.options;
@@ -1051,6 +1143,70 @@ export class WorkflowFormatFixer {
   }
 
   /**
+   * Fix Filter node structure
+   */
+  fixFilterNode(node) {
+    if (!node.parameters) node.parameters = {};
+    
+    // Fix conditions structure, especially fixing string-based conditions
+    if (node.parameters.conditions?.string) {
+      // Convert string-type conditions to boolean type
+      let booleanConditions = [];
+      
+      // Process string conditions
+      if (Array.isArray(node.parameters.conditions.string)) {
+        booleanConditions = node.parameters.conditions.string.map(condition => {
+          return {
+            value1: condition.value1,
+            operation: condition.operation || "equal",
+            value2: condition.value2
+          };
+        });
+      } else if (node.parameters.conditions.string) {
+        // Single condition as object
+        booleanConditions = [{
+          value1: node.parameters.conditions.string.value1,
+          operation: node.parameters.conditions.string.operation || "equal",
+          value2: node.parameters.conditions.string.value2
+        }];
+      }
+      
+      // Replace with proper boolean structure
+      node.parameters.dataType = "boolean";
+      node.parameters.conditions = {
+        boolean: booleanConditions
+      };
+    }
+    
+    // Check if we need to create a default filter structure
+    if (!node.parameters.dataType) {
+      node.parameters.dataType = "boolean";
+      
+      if (!node.parameters.conditions || !node.parameters.conditions.boolean) {
+        node.parameters.conditions = {
+          boolean: [{
+            value1: "={{$json[\"active\"]}}",
+            operation: "equal",
+            value2: true
+          }]
+        };
+      }
+    }
+    
+    // Ensure combination mode is set
+    if (!node.parameters.combineOperation) {
+      node.parameters.combineOperation = "AND";
+    }
+    
+    // Convert any lowercase combiners to uppercase
+    if (node.parameters.combineOperation === "and") {
+      node.parameters.combineOperation = "AND";
+    } else if (node.parameters.combineOperation === "or") {
+      node.parameters.combineOperation = "OR";
+    }
+  }
+  
+  /**
    * Fix OpenAI node parameters
    */
   fixOpenAINode(node) {
@@ -1118,6 +1274,35 @@ export class WorkflowFormatFixer {
         ];
       }
     }
+  }
+
+  /**
+   * Fix lowercase node type names to correct camelCase format
+   */
+  fixNodeTypeNames(workflow) {
+    if (!workflow.nodes) return;
+    
+    // Map of lowercase node types to their correct camelCase versions
+    const nodeTypeCasingMap = {
+      'n8n-nodes-base.gmailtrigger': 'n8n-nodes-base.gmailTrigger',
+      'n8n-nodes-base.googlesheets': 'n8n-nodes-base.googleSheets',
+      'n8n-nodes-base.googledrive': 'n8n-nodes-base.googleDrive',
+      'n8n-nodes-base.googledrivetrigger': 'n8n-nodes-base.googleDriveTrigger',
+      'n8n-nodes-base.httprequest': 'n8n-nodes-base.httpRequest',
+      'n8n-nodes-base.scheduletrigger': 'n8n-nodes-base.scheduleTrigger',
+      'n8n-nodes-base.respondtowebhook': 'n8n-nodes-base.respondToWebhook',
+      'n8n-nodes-base.emailsend': 'n8n-nodes-base.emailSend',
+      'n8n-nodes-base.functionitem': 'n8n-nodes-base.functionItem',
+      'n8n-nodes-base.openai': 'n8n-nodes-base.openAi',
+      'n8n-nodes-base.splitinbatches': 'n8n-nodes-base.splitInBatches',
+    };
+    
+    // Fix node type casing
+    workflow.nodes.forEach(node => {
+      if (node.type && nodeTypeCasingMap[node.type.toLowerCase()]) {
+        node.type = nodeTypeCasingMap[node.type.toLowerCase()];
+      }
+    });
   }
 
   /**

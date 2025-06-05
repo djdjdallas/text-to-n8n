@@ -13,13 +13,13 @@ export class ClaudePromptOptimizer {
         strengthLogic: 0.98,
         strengthCreativity: 0.9,
       },
-      "claude-opus-4-20250514": {
+      "claude-3-7-sonnet-20250219": {
         maxTokens: 8192,
         strengthJSON: 0.95,
         strengthLogic: 0.95,
         strengthCreativity: 0.85,
       },
-      "claude-opus-4-20250514": {
+      "claude-3-5-sonnet-20240620": {
         maxTokens: 8192,
         strengthJSON: 0.9,
         strengthLogic: 0.85,
@@ -312,6 +312,8 @@ CRITICAL BUGS TO AVOID:
 CRITICAL FORMAT REQUIREMENTS:
   
   1. GMAIL TRIGGER NODE:
+   - CORRECT node type is "n8n-nodes-base.gmailTrigger" (camelCase with capital T)
+   - NEVER use lowercase "n8n-nodes-base.gmailtrigger" - it causes import errors
    - labelIds must be an array at root level: parameters.labelIds = ["INBOX"]
    - DO NOT use label: "INBOX" - this is INCORRECT
    - includeAttachments: true only provides metadata, not binary data
@@ -331,6 +333,9 @@ CRITICAL FORMAT REQUIREMENTS:
      - Channel should start with # (e.g., "#general")
      - Include credentials object
      - NEVER include otherOptions field (not even with values)
+     - ⚠️ IMPORTANT: NEVER add '=' prefix to text field
+     - WRONG: "text": "=**VIP Email**" (will cause errors)
+     - CORRECT: "text": "**VIP Email**" (no equal sign prefix)
      - CORRECT structure:
        "parameters": {
          "operation": "post",
@@ -423,10 +428,20 @@ CRITICAL FORMAT REQUIREMENTS:
   8. RESPONDTOWEBHOOK NODE:
      - responseCode must be a number at parameters level, not in options
      - Do NOT use expressions for responseCode
-     - CORRECT structure:
+     - NEVER use complex expressions like: "responseData": "={{JSON.stringify({success: true})}}" 
+     - CORRECT structure - use simple format:
        "parameters": {
+         "respondWith": "json",
          "responseCode": 200,
-         "responseData": "={{JSON.stringify($json)}}"
+         "options": {
+           "responseData": "firstEntryJson"
+         }
+       }
+     - Or for basic text responses:
+       "parameters": {
+         "respondWith": "text",
+         "responseCode": 200,
+         "responseData": "Success"
        }
   
   9. ALL NODES:
@@ -454,7 +469,23 @@ CRITICAL FORMAT REQUIREMENTS:
      - AVOID: function nodes for simple data creation
      - AVOID: noOp nodes (they do nothing)
      - Prefer Switch over IF for binary conditions
-     - Use Set node for data creation instead of function`;
+     - Use Set node for data creation instead of function
+     
+  13. FILTER NODE STRUCTURE:
+     - CORRECT format for Filter node:
+       "parameters": {
+         "dataType": "boolean",
+         "conditions": {
+           "boolean": [{
+             "value1": "={{$json[\"active\"]}}",
+             "operation": "equal",
+             "value2": true
+           }]
+         },
+         "combineOperation": "AND"
+       }
+     - NEVER use conditions.string format - always use conditions.boolean
+     - combineOperation must be uppercase "AND" or "OR"`;
 
       // Add error handling specs if enabled
       if (options.errorHandling) {
@@ -481,11 +512,22 @@ CRITICAL FORMAT REQUIREMENTS:
   CRITICAL FORMAT REQUIREMENTS:
   
   1. GMAIL TRIGGER NODE:
+   - Type MUST be: "n8n-nodes-base.gmailTrigger" (with capital T)
+   - CORRECT node type is "n8n-nodes-base.gmailTrigger" (camelCase with capital T)
+   - NEVER use lowercase "n8n-nodes-base.gmailtrigger" - it causes import errors
    - labelIds must be an array at root level: parameters.labelIds = ["INBOX"]
+   - DO NOT use label: "INBOX" - this is INCORRECT
+   - Credentials MUST use gmailOAuth2 (NOT gmailOAuth2Api):
+     "credentials": {
+       "gmailOAuth2": {
+         "id": "1",
+         "name": "Gmail account"
+       }
+     }
    - includeAttachments: true only provides metadata, not binary data
    - To filter by subject, use a separate IF node after the trigger
    - To download attachments, use Gmail node with "getAttachment" operation
-   - Example:
+   - CORRECT structure:
      "parameters": {
        "labelIds": ["INBOX"],
        "includeAttachments": true
@@ -497,14 +539,19 @@ CRITICAL FORMAT REQUIREMENTS:
      - Must have authentication: "accessToken"
      - Do NOT include 'resource' parameter
      - Channel should start with # (e.g., "#general")
+     - text field should NOT start with = sign
+     - ⚠️ IMPORTANT: ALWAYS include otherOptions: {} (even if empty)
+     - ⚠️ IMPORTANT: NEVER add '=' prefix to text field
+     - WRONG: "text": "=**VIP Email**" (will cause errors)
+     - CORRECT: "text": "**VIP Email**" (no equal sign prefix)
      - Include credentials object
-     - Example:
+     - CORRECT structure:
        "parameters": {
          "operation": "post",
          "authentication": "accessToken", 
          "channel": "#general",
          "text": "Your message here",
-         "otherOptions": {}
+         "otherOptions": {}  // REQUIRED even if empty
        }
   
   3. IF NODE CONDITIONS:
@@ -568,17 +615,38 @@ CRITICAL FORMAT REQUIREMENTS:
      - Each connection must have: node, type, index
   
   7. WORKFLOW STRUCTURE:
-   - Must include ONLY these fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+   - Must include ONLY these fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
    - Do NOT include any other fields like _metadata, instructions, or validation
    - settings must have executionOrder: "v1"
    - meta must have instanceId
-   - Include versionId, pinData: {}, staticData: null, tags: []
+   - ALWAYS include these fields at the end of the workflow:
+     "versionId": "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx",
+     "pinData": {},
+     "staticData": null,
+     "tags": [],
+     "active": false
   
   8. DATA REFERENCES:
      - Use expressions: {{$node["NodeName"].json.fieldName}}
      - For current node data: {{$json["fieldName"]}}
+     - CRITICAL: In JSON strings, use SINGLE quotes around field names in expressions to avoid escaping issues
+     - Example: "text": "Email from {{$json['from']}} - {{$json['subject']}}"
+     - NOT: "text": "Email from {{$json[\"from\"]}} - {{$json[\"subject\"]}}"
      - Credentials referenced by name only
      - Boolean values must be actual booleans, not strings
+     
+  9. RESPONSE PATTERNS:
+     - For webhook responses, use a Set node to create response data, then respondToWebhook node
+     - Pattern: Webhook → Process → Set (create response) → respondToWebhook
+     - The Set node should have values like:
+       {
+         "values": {
+           "string": [
+             {"name": "success", "value": "true"},
+             {"name": "message", "value": "Data processed"}
+           ]
+         }
+       }
      HANDLING EMAIL ATTACHMENTS IN N8N:
 1. Gmail Trigger provides attachment metadata only
 2. To download attachment content, use Gmail node with "getAttachment"
@@ -590,6 +658,21 @@ CRITICAL FORMAT REQUIREMENTS:
    - Google Drive node (upload binary data)
    
 Binary data reference: {{$binary.data}} 
+
+SCHEDULE TRIGGER WEEKLY SETUP:
+- To schedule weekly on a specific day/time, use cron expression:
+  "parameters": {
+    "mode": "cronExpression",
+    "cronExpression": "0 8 * * 1"
+  }
+- Cron format: minute hour * * day-of-week (0=Sunday, 1=Monday)
+- Example above runs every Monday at 8:00 AM
+
+WEBHOOK + RESPOND PATTERN:
+- Use this pattern for creating webhook APIs:
+  - Webhook (path="api/data", httpMethod="POST", responseMode="responseNode")
+  - Process data with Function or Set node
+  - respondToWebhook (respondWith="json", responseCode=200, options={responseData:"firstEntryJson"})
 
 GOOGLE DRIVE NODE:
   - For folder search use:
