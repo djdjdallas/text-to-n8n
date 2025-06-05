@@ -39,6 +39,64 @@ export class WorkflowFormatFixer {
   }
 
   /**
+   * Remove any options/otherOptions fields from nodes that shouldn't have them
+   */
+  removeUnknownOptions(workflow) {
+    workflow.nodes?.forEach(node => {
+      // List of nodes that should NEVER have options/otherOptions
+      const noOptionsNodes = [
+        'n8n-nodes-base.slack',
+        'n8n-nodes-base.set',
+        'n8n-nodes-base.if',
+        'n8n-nodes-base.openAi',
+        'n8n-nodes-base.googleSheets'
+      ];
+      
+      if (noOptionsNodes.includes(node.type)) {
+        if (node.parameters?.options) {
+          delete node.parameters.options;
+        }
+        if (node.parameters?.otherOptions) {
+          delete node.parameters.otherOptions;
+        }
+      }
+    });
+  }
+  
+  /**
+   * Aggressively remove ALL options fields from ALL nodes
+   */
+  removeAllOptionsFields(workflow) {
+    workflow.nodes?.forEach(node => {
+      if (node.parameters?.options) {
+        delete node.parameters.options;
+      }
+      if (node.parameters?.otherOptions) {
+        delete node.parameters.otherOptions;
+      }
+    });
+  }
+  
+  /**
+   * Debug helper to identify problematic nodes
+   */
+  debugWorkflow(workflow) {
+    console.log("=== WORKFLOW DEBUG ===");
+    workflow.nodes?.forEach((node, index) => {
+      console.log(`Node ${index}: ${node.name} (${node.type})`);
+      if (node.parameters?.options) {
+        console.log("  ⚠️  HAS OPTIONS:", JSON.stringify(node.parameters.options));
+      }
+      if (node.parameters?.otherOptions) {
+        console.log("  ⚠️  HAS OTHER OPTIONS:", JSON.stringify(node.parameters.otherOptions));
+      }
+      if (node.parameters?.queryParameters?.parameters) {
+        console.log("  ⚠️  HAS NESTED QUERY PARAMETERS");
+      }
+    });
+  }
+
+  /**
    * Fix n8n workflow format issues
    */
   fixN8nWorkflow(workflow) {
@@ -147,6 +205,11 @@ export class WorkflowFormatFixer {
         if (node.type === "n8n-nodes-base.set") {
           this.fixSetNode(node);
         }
+        
+        // Fix OpenAI nodes
+        if (node.type === "n8n-nodes-base.openAi") {
+          this.fixOpenAINode(node);
+        }
       });
     }
 
@@ -174,10 +237,19 @@ export class WorkflowFormatFixer {
     // 6. Fix connections structure
     this.fixConnections(fixed);
 
-    // 7. Remove any metadata that shouldn't be in the import
+    // 7. Clean up all unknown options fields
+    this.removeUnknownOptions(fixed);
+    
+    // 8. Aggressively remove ALL options fields (more reliable)
+    this.removeAllOptionsFields(fixed);
+
+    // 9. Remove any metadata that shouldn't be in the import
     delete fixed._metadata;
 
-    // 8. Generate node replacement suggestions
+    // 10. Debug output for troubleshooting (commented out in production)
+    // this.debugWorkflow(fixed);
+
+    // 11. Generate node replacement suggestions
     fixed.suggestions = this.suggestNodeReplacements(fixed);
 
     return fixed;
@@ -436,9 +508,8 @@ export class WorkflowFormatFixer {
       }
     }
 
-    // Fix otherOptions - remove if empty
-    if (node.parameters.otherOptions && 
-        Object.keys(node.parameters.otherOptions).length === 0) {
+    // ALWAYS remove otherOptions - whether empty or not
+    if (node.parameters.otherOptions) {
       delete node.parameters.otherOptions;
     }
   }
@@ -566,11 +637,9 @@ export class WorkflowFormatFixer {
       node.parameters.sheetName = node.parameters.sheetName.value || "Sheet1";
     }
 
-    // Remove or fix options field for getAll operation
-    if (node.parameters.operation === "getAll" && node.parameters.options) {
-      // Either remove it entirely:
+    // Remove options field for all operations (they cause issues)
+    if (node.parameters.options) {
       delete node.parameters.options;
-      // Or ensure it's in the correct format (if options are supported)
     }
 
     // Fix columns structure for append operation
@@ -582,6 +651,11 @@ export class WorkflowFormatFixer {
         });
         node.parameters.columns.value = simpleColumns;
       }
+    }
+    
+    // Remove valueInputMode if it exists (not supported by n8n)
+    if (node.parameters.valueInputMode) {
+      delete node.parameters.valueInputMode;
     }
   }
 
@@ -728,27 +802,65 @@ export class WorkflowFormatFixer {
         node.parameters.authentication.value || "none";
     }
 
-    // Ensure options object exists
-    if (!node.parameters.options) {
-      node.parameters.options = {};
+    // Fix queryParameters structure - should be flat object, not nested array
+    if (node.parameters.queryParameters?.parameters) {
+      // Convert array format to object format
+      const queryParams = {};
+      node.parameters.queryParameters.parameters.forEach(param => {
+        if (param.name && param.value !== undefined) {
+          queryParams[param.name] = param.value;
+        }
+      });
+      node.parameters.queryParameters = queryParams;
     }
 
-    // Fix headers format
+    // Handle queryParametersUi format too (alternative format)
+    if (node.parameters.queryParametersUi?.parameter) {
+      // If it's not an array, make it an array
+      if (!Array.isArray(node.parameters.queryParametersUi.parameter)) {
+        node.parameters.queryParametersUi.parameter = [
+          node.parameters.queryParametersUi.parameter,
+        ];
+      }
+      
+      // Ensure all parameters have name and value
+      node.parameters.queryParametersUi.parameter = 
+        node.parameters.queryParametersUi.parameter.filter(param => 
+          param && param.name && param.value !== undefined);
+    }
+
+    // Fix headers format for headerParametersUi
     if (node.parameters.headerParametersUi?.parameter) {
       if (!Array.isArray(node.parameters.headerParametersUi.parameter)) {
         node.parameters.headerParametersUi.parameter = [
           node.parameters.headerParametersUi.parameter,
         ];
       }
+      
+      // Ensure all parameters have name and value
+      node.parameters.headerParametersUi.parameter = 
+        node.parameters.headerParametersUi.parameter.filter(param => 
+          param && param.name && param.value !== undefined);
     }
 
-    // Fix query parameters format
-    if (node.parameters.queryParametersUi?.parameter) {
-      if (!Array.isArray(node.parameters.queryParametersUi.parameter)) {
-        node.parameters.queryParametersUi.parameter = [
-          node.parameters.queryParametersUi.parameter,
-        ];
+    // Move essential options to root level (before removing options)
+    if (node.parameters.options) {
+      // Save timeout at root level if present
+      if (node.parameters.options.timeout !== undefined) {
+        node.parameters.timeout = node.parameters.options.timeout;
       }
+      
+      // Handle nested options from previous versions
+      if (node.parameters.options.redirect?.redirect?.followRedirects !== undefined) {
+        node.parameters.followRedirects = node.parameters.options.redirect.redirect.followRedirects;
+      }
+      
+      if (node.parameters.options.response?.response?.fullResponse !== undefined) {
+        node.parameters.fullResponse = node.parameters.options.response.response.fullResponse;
+      }
+      
+      // Remove options field completely
+      delete node.parameters.options;
     }
   }
 
@@ -936,6 +1048,76 @@ export class WorkflowFormatFixer {
     
     // Ensure typeVersion is 1 for set nodes
     node.typeVersion = 1;
+  }
+
+  /**
+   * Fix OpenAI node parameters
+   */
+  fixOpenAINode(node) {
+    if (!node.parameters) node.parameters = {};
+    
+    // Move options fields to root level if they exist
+    if (node.parameters.options) {
+      // Common OpenAI parameters that should be at root level
+      if (node.parameters.options.model) {
+        node.parameters.model = node.parameters.options.model;
+      }
+      
+      if (node.parameters.options.temperature !== undefined) {
+        node.parameters.temperature = node.parameters.options.temperature;
+      }
+      
+      if (node.parameters.options.maxTokens !== undefined) {
+        node.parameters.maxTokens = node.parameters.options.maxTokens;
+      }
+      
+      // Check for max_tokens (snake_case variant)
+      if (node.parameters.options.max_tokens !== undefined) {
+        node.parameters.maxTokens = node.parameters.options.max_tokens;
+      }
+      
+      // Check for other common parameters
+      const commonParams = [
+        'topP', 'frequencyPenalty', 'presencePenalty', 
+        'stop', 'topK', 'n', 'stream'
+      ];
+      
+      commonParams.forEach(param => {
+        if (node.parameters.options[param] !== undefined) {
+          node.parameters[param] = node.parameters.options[param];
+        }
+      });
+      
+      // Remove the options field after moving values
+      delete node.parameters.options;
+    }
+    
+    // Ensure required fields
+    if (!node.parameters.model) {
+      node.parameters.model = "gpt-3.5-turbo"; // Default model
+    }
+    
+    // Check the resource and ensure proper structure
+    if (node.parameters.resource === "chat") {
+      // Ensure prompt.messages exists and is properly formatted
+      if (!node.parameters.prompt) {
+        node.parameters.prompt = {
+          messages: [
+            {
+              role: "system",
+              content: "You are a helpful assistant."
+            }
+          ]
+        };
+      } else if (!node.parameters.prompt.messages) {
+        node.parameters.prompt.messages = [
+          {
+            role: "system",
+            content: "You are a helpful assistant."
+          }
+        ];
+      }
+    }
   }
 
   /**
