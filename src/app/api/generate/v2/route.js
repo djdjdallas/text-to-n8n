@@ -13,6 +13,8 @@ import { validateRequest } from "@/lib/validators/requestValidator";
  */
 function cleanWorkflowForExport(workflow, platform = "n8n") {
   if (platform === "n8n") {
+    console.log("🧹 Starting cleanWorkflowForExport for n8n workflow");
+    
     // STRICT APPROACH: Create a completely new object with ONLY the allowed fields
     // This ensures no metadata or unexpected fields can possibly remain
     const allowedFields = [
@@ -32,33 +34,37 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
       "updatedAt",
     ];
     
-    // Initialize the clean workflow with required fields
+    // CRITICAL FIX: Create a proper deep copy of the workflow to preserve ALL properties
+    // This is essential for preserving nested objects like node parameters and credentials
     const cleanWorkflow = {
       name: workflow.name || "Generated Workflow",
-      // Deep copy nodes to preserve all parameters and nested objects
-      nodes: Array.isArray(workflow.nodes) ? workflow.nodes.map(node => JSON.parse(JSON.stringify(node))) : [],
+      // Use full JSON parse/stringify for deep copying to preserve ALL properties
+      nodes: Array.isArray(workflow.nodes) ? JSON.parse(JSON.stringify(workflow.nodes)) : [],
       connections: workflow.connections ? JSON.parse(JSON.stringify(workflow.connections)) : {},
-      settings: workflow.settings ? {...workflow.settings} : { executionOrder: "v1" },
-      meta: workflow.meta ? {...workflow.meta} : { instanceId: "workflow_instance_id" },
+      settings: workflow.settings ? JSON.parse(JSON.stringify(workflow.settings)) : { executionOrder: "v1" },
+      meta: workflow.meta ? JSON.parse(JSON.stringify(workflow.meta)) : { instanceId: "workflow_instance_id" },
     };
     
-    // Only add optional fields if they exist in the original and are in the allowed list
-    if (workflow.versionId !== undefined) {
-      cleanWorkflow.versionId = workflow.versionId;
-    }
-    if (workflow.pinData !== undefined) {
-      cleanWorkflow.pinData = typeof workflow.pinData === 'object' ? {...workflow.pinData} : {};
-    }
-    if (workflow.staticData !== undefined) {
-      cleanWorkflow.staticData = workflow.staticData === null ? null : 
-        (typeof workflow.staticData === 'object' ? {...workflow.staticData} : null);
-    }
-    if (workflow.tags !== undefined) {
-      cleanWorkflow.tags = Array.isArray(workflow.tags) ? [...workflow.tags] : [];
-    }
-    if (workflow.active !== undefined) {
-      cleanWorkflow.active = Boolean(workflow.active);
-    }
+    // Check the nodes before continuing
+    console.log("🔍 cleanWorkflowForExport - nodes check:");
+    cleanWorkflow.nodes?.forEach(node => {
+      if (node.type === 'n8n-nodes-base.slack') {
+        console.log(`  * Slack node ${node.name}: has otherOptions =`, !!node.parameters?.otherOptions);
+      }
+      if (node.type === 'n8n-nodes-base.gmailTrigger' || node.type === 'n8n-nodes-base.gmail') {
+        console.log(`  * Gmail node ${node.name}: credentials =`, JSON.stringify(node.credentials));
+      }
+    });
+    
+    // Ensure these fields are always included with proper defaults
+    cleanWorkflow.versionId = workflow.versionId || workflowFixer.generateVersionId();
+    cleanWorkflow.pinData = typeof workflow.pinData === 'object' ? JSON.parse(JSON.stringify(workflow.pinData)) : {};
+    cleanWorkflow.staticData = workflow.staticData === null ? null : 
+      (typeof workflow.staticData === 'object' ? JSON.parse(JSON.stringify(workflow.staticData)) : null);
+    cleanWorkflow.tags = Array.isArray(workflow.tags) ? [...workflow.tags] : [];
+    cleanWorkflow.active = workflow.active !== undefined ? Boolean(workflow.active) : false;
+    
+    // Add optional fields only if they exist
     if (workflow.id !== undefined) {
       cleanWorkflow.id = workflow.id;
     }
@@ -75,17 +81,20 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
     // Double-check: remove any fields that might have snuck in
     for (const key in cleanWorkflow) {
       if (!allowedFields.includes(key)) {
+        console.log(`⚠️ Removing non-allowed field from workflow: ${key}`);
         delete cleanWorkflow[key];
       }
     }
     
-    // Deep clean: ensure no _metadata in nested objects
+    // Deep clean: ONLY remove metadata-related fields
+    // DO NOT modify any other properties
     const deepClean = (obj) => {
       if (!obj || typeof obj !== 'object') return;
       
-      // Clean current level
+      // Clean current level - ONLY removing specific metadata fields
       for (const key in obj) {
         if (key.startsWith('_') || key === 'metadata' || key === 'instructions' || key === 'validation') {
+          console.log(`⚠️ Removing metadata field from nested object: ${key}`);
           delete obj[key];
         } else if (typeof obj[key] === 'object' && obj[key] !== null) {
           // Recursively clean nested objects and arrays
@@ -94,8 +103,16 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
       }
     };
     
-    // Apply deep cleaning to the entire workflow
+    // Apply deep cleaning to the entire workflow - but only for metadata fields
     deepClean(cleanWorkflow);
+    
+    // Log the status of crucial fields
+    console.log("🔍 After cleanWorkflowForExport processing:");
+    console.log("  - Has versionId:", !!cleanWorkflow.versionId);
+    console.log("  - Has pinData:", !!cleanWorkflow.pinData);
+    console.log("  - Has staticData:", cleanWorkflow.staticData !== undefined);
+    console.log("  - Has tags:", !!cleanWorkflow.tags);
+    console.log("  - Has active:", cleanWorkflow.active !== undefined);
     
     return cleanWorkflow;
   }
@@ -193,22 +210,72 @@ export async function POST(req) {
       claudeResponse.content
     );
 
+    // Debug logging before any fixes
+    if (platform === "n8n") {
+      console.log("📊 BEFORE formatFixer - Initial state:");
+      console.log("  - Slack nodes check:");
+      workflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.slack') {
+          console.log(`    * ${node.name}: has otherOptions =`, !!node.parameters?.otherOptions);
+        }
+      });
+      console.log("  - Gmail nodes check:");
+      workflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.gmailTrigger' || node.type === 'n8n-nodes-base.gmail') {
+          console.log(`    * ${node.name}: credentials =`, JSON.stringify(node.credentials));
+        }
+      });
+      console.log("  - Top-level workflow fields:", Object.keys(workflow).join(', '));
+    }
+
     // 5. Fix platform-specific format issues
     if (platform === "n8n") {
+      console.log("🔧 Applying n8n format fixes...");
       workflow = workflowFixer.fixN8nWorkflow(workflow);
-      console.log("🔍 After workflowFixer: Slack nodes have otherOptions:", 
-        workflow.nodes?.some(n => n.type === 'n8n-nodes-base.slack' && n.parameters?.otherOptions));
-      console.log("🔍 After workflowFixer: Top-level fields:", Object.keys(workflow).join(', '));
+      console.log("✅ Format fixes applied");
+      
+      // Debug logging after fixes
+      console.log("📊 AFTER formatFixer - Fixed state:");
+      console.log("  - Slack nodes check:");
+      workflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.slack') {
+          console.log(`    * ${node.name}: has otherOptions =`, !!node.parameters?.otherOptions);
+          if (node.parameters?.otherOptions) {
+            console.log(`      * otherOptions content:`, JSON.stringify(node.parameters.otherOptions));
+          }
+        }
+      });
+      console.log("  - Gmail nodes check:");
+      workflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.gmailTrigger' || node.type === 'n8n-nodes-base.gmail') {
+          console.log(`    * ${node.name}: credentials =`, JSON.stringify(node.credentials));
+        }
+      });
+      console.log("  - Top-level workflow fields:", Object.keys(workflow).join(', '));
     }
 
     // 6. IMPORTANT: Clean the workflow to remove any metadata or non-standard fields
     const cleanedWorkflow = cleanWorkflowForExport(workflow, platform);
     
-    // Debug logging to verify the cleaning didn't remove critical fixes
+    // Detailed debug logging after cleaning
     if (platform === "n8n") {
-      console.log("🔍 After cleaning: Slack nodes have otherOptions:", 
-        cleanedWorkflow.nodes?.some(n => n.type === 'n8n-nodes-base.slack' && n.parameters?.otherOptions));
-      console.log("🔍 After cleaning: Top-level fields:", Object.keys(cleanedWorkflow).join(', '));
+      console.log("📊 AFTER cleaning - Sanitized state:");
+      console.log("  - Slack nodes check:");
+      cleanedWorkflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.slack') {
+          console.log(`    * ${node.name}: has otherOptions =`, !!node.parameters?.otherOptions);
+          if (node.parameters?.otherOptions) {
+            console.log(`      * otherOptions content:`, JSON.stringify(node.parameters.otherOptions));
+          }
+        }
+      });
+      console.log("  - Gmail nodes check:");
+      cleanedWorkflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.gmailTrigger' || node.type === 'n8n-nodes-base.gmail') {
+          console.log(`    * ${node.name}: credentials =`, JSON.stringify(node.credentials));
+        }
+      });
+      console.log("  - Top-level workflow fields:", Object.keys(cleanedWorkflow).join(', '));
     }
 
     // 7. Validate if requested (use cleaned workflow)
@@ -281,28 +348,39 @@ export async function POST(req) {
     
     // EMERGENCY FIX: Create a separate endpoint for copy functionality
     if (platform === "n8n") {
-      // Create a completely separate workflow JSON with absolutely nothing but the allowed fields
-      // Using deep copies to ensure all nested properties are preserved
-      const importReadyWorkflow = {
-        name: cleanedWorkflow.name || "Generated Workflow",
-        nodes: cleanedWorkflow.nodes ? JSON.parse(JSON.stringify(cleanedWorkflow.nodes)) : [],
-        connections: cleanedWorkflow.connections ? JSON.parse(JSON.stringify(cleanedWorkflow.connections)) : {},
-        settings: cleanedWorkflow.settings ? JSON.parse(JSON.stringify(cleanedWorkflow.settings)) : { executionOrder: "v1" },
-        meta: cleanedWorkflow.meta ? JSON.parse(JSON.stringify(cleanedWorkflow.meta)) : { instanceId: "workflow_instance_id" },
-      };
+      console.log("🔧 Creating final importReadyWorkflow for client");
+      
+      // CRITICAL: Ensure Slack nodes have otherOptions
+      console.log("🔧 Final fixup: Re-adding otherOptions to Slack nodes");
+      cleanedWorkflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.slack') {
+          if (!node.parameters) node.parameters = {};
+          node.parameters.otherOptions = {};
+          console.log(`✅ Added otherOptions to Slack node "${node.name}" in final workflow`);
+        }
+        
+        // Fix Gmail credentials if needed
+        if ((node.type === 'n8n-nodes-base.gmailTrigger' || node.type === 'n8n-nodes-base.gmail') && 
+            node.credentials?.gmailOAuth2Api) {
+          node.credentials.gmailOAuth2 = {
+            id: node.credentials.gmailOAuth2Api.id || "1",
+            name: node.credentials.gmailOAuth2Api.name || "Gmail account"
+          };
+          delete node.credentials.gmailOAuth2Api;
+          console.log(`✅ Fixed Gmail credentials for node "${node.name}" in final workflow`);
+        }
+      });
+      
+      // Deep copy the fixed cleanedWorkflow
+      const importReadyWorkflow = JSON.parse(JSON.stringify(cleanedWorkflow));
       
       // ENSURE these critical fields are ALWAYS included (even with default values)
-      importReadyWorkflow.versionId = cleanedWorkflow.versionId || workflowFixer.generateVersionId();
-      importReadyWorkflow.pinData = cleanedWorkflow.pinData || {};
-      importReadyWorkflow.staticData = cleanedWorkflow.staticData !== undefined ? cleanedWorkflow.staticData : null;
-      importReadyWorkflow.tags = cleanedWorkflow.tags || [];
-      importReadyWorkflow.active = cleanedWorkflow.active !== undefined ? cleanedWorkflow.active : false;
-      
-      // Add these optional fields only if they exist
-      if (cleanedWorkflow.id) importReadyWorkflow.id = cleanedWorkflow.id;
-      if (cleanedWorkflow.triggerCount !== undefined) importReadyWorkflow.triggerCount = cleanedWorkflow.triggerCount;
-      if (cleanedWorkflow.createdAt) importReadyWorkflow.createdAt = cleanedWorkflow.createdAt;
-      if (cleanedWorkflow.updatedAt) importReadyWorkflow.updatedAt = cleanedWorkflow.updatedAt;
+      // This is belt-and-suspenders to make absolutely sure they're present
+      importReadyWorkflow.versionId = importReadyWorkflow.versionId || workflowFixer.generateVersionId();
+      importReadyWorkflow.pinData = importReadyWorkflow.pinData || {};
+      importReadyWorkflow.staticData = importReadyWorkflow.staticData !== undefined ? importReadyWorkflow.staticData : null;
+      importReadyWorkflow.tags = importReadyWorkflow.tags || [];
+      importReadyWorkflow.active = importReadyWorkflow.active !== undefined ? importReadyWorkflow.active : false;
       
       // Set directly as a string to avoid any chance of mutation
       response.copyableJSON = JSON.stringify(importReadyWorkflow, null, 2);
@@ -310,8 +388,25 @@ export async function POST(req) {
       // Also provide a direct import endpoint for copying
       response.directImportUrl = `/api/workflow/export/${Date.now()}`;
       
-      // Final debug log to verify what's being returned
-      console.log("🔄 FINAL WORKFLOW:", JSON.stringify(importReadyWorkflow, null, 2).substring(0, 200) + "...");
+      // Final detailed debug logs to verify what's being returned
+      console.log("📊 FINAL WORKFLOW - Import-ready state:");
+      console.log("  - Slack nodes check:");
+      importReadyWorkflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.slack') {
+          console.log(`    * ${node.name}: has otherOptions =`, !!node.parameters?.otherOptions);
+          if (node.parameters?.otherOptions) {
+            console.log(`      * otherOptions content:`, JSON.stringify(node.parameters.otherOptions));
+          }
+        }
+      });
+      console.log("  - Gmail nodes check:");
+      importReadyWorkflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.gmailTrigger' || node.type === 'n8n-nodes-base.gmail') {
+          console.log(`    * ${node.name}: credentials =`, JSON.stringify(node.credentials));
+        }
+      });
+      console.log("  - Top-level workflow fields:", Object.keys(importReadyWorkflow).join(', '));
+      console.log("🔄 FINAL WORKFLOW (first 200 chars):", JSON.stringify(importReadyWorkflow, null, 2).substring(0, 200) + "...");
     }
 
     return NextResponse.json(response);

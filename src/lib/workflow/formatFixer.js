@@ -254,6 +254,16 @@ export class WorkflowFormatFixer {
     // 8. Aggressively remove ALL options fields (more reliable)
     this.removeAllOptionsFields(fixed);
 
+    // 8.5. Re-add otherOptions for Slack nodes (must be after removal)
+    console.log("🔧 Re-adding otherOptions to Slack nodes after options removal");
+    fixed.nodes?.forEach(node => {
+      if (node.type === 'n8n-nodes-base.slack') {
+        if (!node.parameters) node.parameters = {};
+        node.parameters.otherOptions = {};
+        console.log(`✅ Re-added otherOptions to Slack node "${node.name}"`);
+      }
+    });
+
     // 9. Remove any metadata that shouldn't be in the import
     delete fixed._metadata;
 
@@ -532,9 +542,9 @@ export class WorkflowFormatFixer {
       node.parameters.blocks = node.parameters.blocks.substring(1);
     }
 
-    // ALWAYS ensure otherOptions exists for Slack nodes (empty object)
-    node.parameters.otherOptions = {};
-    console.log(`✅ Fixed Slack node "${node.name}" - otherOptions added`);
+    // Log the initial Slack node fix - but the actual fix happens later
+    // after removeAllOptionsFields runs (see re-adding step at the end of fixN8nWorkflow)
+    console.log(`ℹ️ Initial Slack node "${node.name}" processing - otherOptions will be added later`);
   }
 
   /**
