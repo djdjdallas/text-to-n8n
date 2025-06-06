@@ -8,36 +8,51 @@ export function useWorkflowGeneratorV2() {
   const [result, setResult] = useState(null);
 
   const generateWorkflow = async (params) => {
+    console.log('🎯 [CLIENT] Starting workflow generation...');
     setIsGenerating(true);
     setError(null);
 
     try {
+      const requestBody = {
+        input: params.input,
+        platform: params.platform || "n8n",
+        complexity: params.complexity || "simple",
+        errorHandling: params.errorHandling ?? true,
+        optimization: params.optimization || 50,
+        provider: params.provider || "claude",
+        useRAG: params.useRAG ?? true,
+        validateOutput: params.validateOutput ?? true,
+      };
+      
+      console.log('📝 [CLIENT] Request body:', requestBody);
+
       const response = await fetch("/api/generate/v2", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          input: params.input,
-          platform: params.platform || "n8n",
-          complexity: params.complexity || "simple",
-          errorHandling: params.errorHandling ?? true,
-          optimization: params.optimization || 50,
-          provider: params.provider || "claude",
-          useRAG: params.useRAG ?? true,
-          validateOutput: params.validateOutput ?? true,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      console.log('📡 [CLIENT] Response received:', response.status);
 
-      if (!response.ok || !data.success) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ [CLIENT] Error response:', errorText);
+        throw new Error(errorText);
+      }
+
+      const data = await response.json();
+      console.log('✅ [CLIENT] Data parsed successfully');
+
+      if (!data.success) {
         throw new Error(data.error || "Failed to generate workflow");
       }
 
       setResult(data);
       return data;
     } catch (err) {
+      console.error('❌ [CLIENT] Request failed:', err);
       setError(err.message);
       throw err;
     } finally {

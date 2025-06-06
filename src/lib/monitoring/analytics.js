@@ -91,6 +91,11 @@ class WorkflowAnalytics {
   }
 
   async trackRAGUsage(params) {
+    if (!this.supabase) {
+      console.warn('⚠️ RAG usage tracking skipped - Supabase not initialized');
+      return;
+    }
+
     const {
       queryId,
       platform,
@@ -100,15 +105,19 @@ class WorkflowAnalytics {
       responseTime,
     } = params;
 
-    await this.supabase.from("rag_usage").insert({
-      query_id: queryId,
-      platform,
-      query_text: query,
-      documents_retrieved: documentsRetrieved,
-      avg_relevance_score: relevanceScores.length > 0 ? relevanceScores.reduce((a, b) => a + b, 0) / relevanceScores.length : 0,
-      response_time_ms: responseTime,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      await this.supabase.from("rag_usage").insert({
+        query_id: queryId,
+        platform,
+        query_text: query,
+        documents_retrieved: documentsRetrieved,
+        avg_relevance_score: relevanceScores.length > 0 ? relevanceScores.reduce((a, b) => a + b, 0) / relevanceScores.length : 0,
+        response_time_ms: responseTime,
+        created_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('❌ RAG usage tracking failed:', error);
+    }
   }
 
   async getGenerationMetrics(timeframe = "7d") {

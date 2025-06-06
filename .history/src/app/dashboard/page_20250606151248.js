@@ -15,7 +15,6 @@ export default function Dashboard() {
   const [output, setOutput] = useState(null);
   const [generationStartTime, setGenerationStartTime] = useState(null);
   const [workflowPrompts, setWorkflowPrompts] = useState([]);
-  const [groupedPrompts, setGroupedPrompts] = useState({});
   const [selectedPrompt, setSelectedPrompt] = useState(null);
   const [promptsLoading, setPromptsLoading] = useState(false);
   const [metrics, setMetrics] = useState({
@@ -37,11 +36,9 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json();
         setWorkflowPrompts(data.prompts || []);
-        setGroupedPrompts(data.groupedPrompts || {});
       }
     } catch (error) {
       console.error("Error fetching workflow prompts:", error);
-      setGroupedPrompts({}); // Set empty object on error
     } finally {
       setPromptsLoading(false);
     }
@@ -53,18 +50,6 @@ export default function Dashboard() {
 
   const toggleBottomPanel = () => {
     setBottomPanelCollapsed(!bottomPanelCollapsed);
-  };
-
-  const mapComplexity = (complexity) => {
-    const mapping = {
-      'basic': 'simple',
-      'balanced': 'moderate', 
-      'moderate': 'moderate',
-      'advanced': 'complex',
-      'complex': 'complex',
-      'simple': 'simple'
-    };
-    return mapping[complexity] || complexity;
   };
 
   const handlePromptSelect = (prompt) => {
@@ -80,13 +65,6 @@ export default function Dashboard() {
       const startTime = Date.now();
       setGenerationStartTime(startTime);
 
-      console.log("Generate params:", params); // Debug log
-
-      // Ensure we have required fields
-      if (!params.input || params.input.trim() === '') {
-        throw new Error("Please enter a workflow description");
-      }
-
       // Use V2 endpoint
       const response = await fetch("/api/generate/v2", {
         method: "POST",
@@ -95,10 +73,10 @@ export default function Dashboard() {
         },
         body: JSON.stringify({
           input: params.input,
-          platform: params.platform || "n8n", // Default to n8n
-          complexity: mapComplexity(params.complexity) || "moderate",
-          errorHandling: params.errorHandling !== false, // Default to true
-          optimization: params.optimization || 50,
+          platform: params.platform,
+          complexity: params.complexity,
+          errorHandling: params.errorHandling,
+          optimization: params.optimization,
           provider: "claude", // Use Claude by default
           useRAG: true, // Enable RAG
           validateOutput: true, // Enable validation
@@ -108,9 +86,6 @@ export default function Dashboard() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("API Error:", errorData);
-        console.error("Error details:", errorData.details);
-        console.error("Received body:", errorData.receivedBody);
         throw new Error(errorData.error || "Failed to generate workflow");
       }
 
@@ -155,12 +130,8 @@ export default function Dashboard() {
 
       // Track successful generation if using a prompt
       if (selectedPrompt?.id) {
-        await fetch(`/api/workflow-prompts`, {
+        await fetch(`/api/workflow-prompts/${selectedPrompt.id}/track`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ promptId: selectedPrompt.id }),
         });
       }
     } catch (error) {
@@ -190,16 +161,9 @@ export default function Dashboard() {
         <Sidebar
           isCollapsed={sidebarCollapsed}
           toggleSidebar={toggleSidebar}
-          groupedPrompts={groupedPrompts}
+          workflowPrompts={workflowPrompts}
           onPromptSelect={handlePromptSelect}
           promptsLoading={promptsLoading}
-          onFilterChange={() => {}} // Add empty handler for now
-          getPopularPrompts={async (limit) => {
-            // Return the most used prompts
-            return workflowPrompts
-              .sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0))
-              .slice(0, limit);
-          }}
         />
 
         <div className="flex flex-1 overflow-hidden">

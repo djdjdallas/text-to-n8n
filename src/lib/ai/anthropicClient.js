@@ -57,6 +57,11 @@ export class AnthropicClient {
   buildSystemPrompt(platform, complexity) {
     const basePrompt = `You are an expert automation engineer specializing in ${platform} workflows.
   
+  CRITICAL REQUIREMENTS:
+  - You MUST generate a COMPLETE workflow JSON, not just node parameters
+  - The response MUST include nodes array, connections object, and settings
+  - NEVER return partial structures or single node configurations
+  
   Core Responsibilities:
   - Generate syntactically perfect ${platform} JSON workflows
   - Follow platform-specific conventions and best practices
@@ -67,7 +72,14 @@ export class AnthropicClient {
   - Respond with ONLY valid JSON - no explanations, markdown, or extra text
   - Ensure all node/step IDs are unique and properly referenced
   - Include all required parameters for each integration
-  - Use proper data mapping syntax for the platform`;
+  - Use proper data mapping syntax for the platform
+  - The workflow MUST have this structure:
+    {
+      "name": "workflow name",
+      "nodes": [array of node objects],
+      "connections": {object mapping node connections},
+      "settings": {workflow settings}
+    }`;
 
     const complexityInstructions = {
       simple:
@@ -102,7 +114,13 @@ export class AnthropicClient {
    * Make API request with retry logic
    */
   async makeRequestWithRetry(endpoint, body, attempt = 1) {
+    console.log(`🌐 [ANTHROPIC] Making request to ${endpoint}, attempt ${attempt}`);
+    
     try {
+      // Add timeout wrapper
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: "POST",
         headers: {
@@ -111,7 +129,11 @@ export class AnthropicClient {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify(body),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      console.log(`🌐 [ANTHROPIC] Response received: ${response.status}`);
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
@@ -161,6 +183,11 @@ export class AnthropicClient {
         model: data.model,
       };
     } catch (error) {
+      if (error.name === 'AbortError') {
+        console.error('❌ [ANTHROPIC] Request timed out');
+        throw new Error('Claude API request timed out after 2 minutes');
+      }
+      
       if (attempt <= this.maxRetries && this.isRetryableError(error)) {
         console.log(
           `Request failed: ${error.message}. Retrying (attempt ${attempt})`

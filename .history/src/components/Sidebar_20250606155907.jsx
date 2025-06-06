@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Filter,
 } from "lucide-react";
+
 export default function Sidebar({
   isCollapsed,
   toggleSidebar,

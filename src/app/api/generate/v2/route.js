@@ -8,6 +8,107 @@ import { workflowFixer } from "@/lib/workflow/formatFixer";
 import { validateRequest } from "@/lib/validators/requestValidator";
 import { N8nValidationLoop } from "@/lib/validation/n8nValidationLoop";
 import { analytics } from "@/lib/monitoring/analytics";
+import { promptEnhancer } from "@/lib/prompts/promptEnhancer";
+
+/**
+ * Validate AI workflow structure before processing
+ * Ensures the AI returned a complete workflow, not just parameters
+ */
+function validateAIWorkflowStructure(workflow) {
+  const errors = [];
+  const warnings = [];
+  
+  // Check for required top-level fields
+  if (!workflow || typeof workflow !== 'object') {
+    errors.push('Workflow must be an object');
+    return { valid: false, errors, warnings };
+  }
+  
+  if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
+    errors.push('Workflow must have a nodes array');
+  }
+  
+  if (!workflow.connections || typeof workflow.connections !== 'object') {
+    warnings.push('Workflow should have a connections object');
+  }
+  
+  // Check if AI returned node parameters instead of a workflow
+  const topLevelKeys = Object.keys(workflow);
+  const nodeParamIndicators = ['labelIds', 'parameters', 'includeAttachments', 'operation', 'resource'];
+  const looksLikeNodeParams = nodeParamIndicators.some(key => topLevelKeys.includes(key));
+  
+  if (looksLikeNodeParams && !workflow.nodes) {
+    errors.push('AI returned node parameters instead of a complete workflow structure');
+    
+    // Try to reconstruct
+    const reconstructed = reconstructWorkflowFromParams(workflow);
+    if (reconstructed) {
+      return {
+        valid: false,
+        errors,
+        warnings: ['Workflow was reconstructed from node parameters'],
+        reconstructed
+      };
+    }
+  }
+  
+  // Check node structure
+  if (workflow.nodes && workflow.nodes.length > 0) {
+    workflow.nodes.forEach((node, index) => {
+      if (!node.id) warnings.push(`Node ${index} is missing an id`);
+      if (!node.name) errors.push(`Node ${index} is missing a name`);
+      if (!node.type) errors.push(`Node ${index} is missing a type`);
+      if (!node.position) warnings.push(`Node ${index} is missing position`);
+    });
+  } else if (workflow.nodes) {
+    errors.push('Workflow has no nodes');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    reconstructed: null
+  };
+}
+
+/**
+ * Attempt to reconstruct a workflow from node parameters
+ */
+function reconstructWorkflowFromParams(params) {
+  console.log('🔧 Attempting to reconstruct workflow from parameters:', params);
+  
+  // Detect the type of node based on parameters
+  let nodeType = 'n8n-nodes-base.noOp';
+  let nodeName = 'Generated Node';
+  
+  if (params.labelIds || params.includeAttachments) {
+    nodeType = 'n8n-nodes-base.gmailTrigger';
+    nodeName = 'Gmail Trigger';
+  } else if (params.webhookPath || params.httpMethod) {
+    nodeType = 'n8n-nodes-base.webhook';
+    nodeName = 'Webhook';
+  } else if (params.channel || params.text) {
+    nodeType = 'n8n-nodes-base.slack';
+    nodeName = 'Slack';
+  }
+  
+  return {
+    name: "Reconstructed Workflow",
+    nodes: [{
+      id: workflowFixer.generateNodeId(),
+      name: nodeName,
+      type: nodeType,
+      typeVersion: 1,
+      position: [250, 300],
+      parameters: params
+    }],
+    connections: {},
+    settings: {
+      executionOrder: "v1"
+    }
+  };
+}
 
 /**
  * Strict cleaning function for n8n validation
@@ -250,17 +351,39 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
 const n8nValidator = new N8nValidationLoop();
 
 export async function POST(req) {
+  console.log("🚀 [GENERATE V2] Request received");
+  
   try {
-    const body = await req.json();
+    let body;
+    try {
+      body = await req.json();
+      console.log("📝 [GENERATE V2] Body parsed:", body);
+    } catch (parseError) {
+      console.error("❌ [GENERATE V2] JSON parse error:", parseError);
+      return NextResponse.json(
+        { 
+          error: "Invalid JSON in request body", 
+          details: parseError.message 
+        },
+        { status: 400 }
+      );
+    }
 
     // Validate request
     const validation = validateRequest(body);
     if (!validation.valid) {
+      console.log("❌ [GENERATE V2] Validation failed:", validation.errors);
+      console.log("❌ [GENERATE V2] Request body:", body);
       return NextResponse.json(
-        { error: "Invalid request", details: validation.errors },
+        { 
+          error: "Invalid request", 
+          details: validation.errors,
+          receivedBody: body 
+        },
         { status: 400 }
       );
     }
+    console.log("✅ [GENERATE V2] Request validated");
 
     const {
       input,
@@ -289,13 +412,17 @@ export async function POST(req) {
     };
 
     // 1. Initialize RAG if needed
+    console.log("🔍 [GENERATE V2] Starting RAG initialization...");
     let relevantDocs = [];
     let ragMetadata = {};
 
     if (useRAG) {
       const ragStart = Date.now();
       const ragSystem = new RAGSystem();
+      console.log("📚 [GENERATE V2] RAG system created");
+      
       await ragSystem.initialize();
+      console.log("📚 [GENERATE V2] RAG system initialized:", ragSystem.initialized);
 
       if (ragSystem.initialized) {
         const ragResult = await ragSystem.getRelevantContext(input, platform, {
@@ -311,20 +438,24 @@ export async function POST(req) {
         };
       }
       timing.ragSearch = Date.now() - ragStart;
+      console.log(`📚 [GENERATE V2] RAG search completed in ${timing.ragSearch}ms`);
     }
 
-    // 2. Generate optimized prompt
-    const optimizedPrompt = await claudeOptimizer.generateOptimizedPrompt(
+    // 2. Enhance the prompt for better structure
+    console.log("🎯 [GENERATE V2] Enhancing prompt for better structure...");
+    const enhancedPromptData = promptEnhancer.enhance(input, {
       platform,
-      input,
-      relevantDocs,
-      { complexity, errorHandling, optimization, includeExamples: true }
-    );
+      complexity,
+      ragContext: relevantDocs
+    });
+    
+    console.log("📊 [GENERATE V2] Enhanced prompt metadata:", enhancedPromptData.metadata);
 
-    // 3. Generate with Claude
+    // 3. Generate with Claude using enhanced prompt
+    console.log("🤖 [GENERATE V2] Calling Claude API with enhanced prompt...");
     const genStart = Date.now();
     const claudeResponse = await anthropicClient.generateWorkflow(
-      optimizedPrompt,
+      enhancedPromptData.enhanced, // Use the enhanced prompt
       {
         model: "claude-opus-4-20250514", // Use the specified model
         platform,
@@ -334,56 +465,63 @@ export async function POST(req) {
       }
     );
     timing.generation = Date.now() - genStart;
+    console.log("🤖 [GENERATE V2] Claude response received in", timing.generation, "ms");
 
-    // 4. Parse JSON
+    // 4. Parse JSON with detailed logging
+    console.log("📋 [GENERATE V2] Extracting JSON from Claude response...");
+    console.log("🔍 [DEBUG] Raw AI response preview:", claudeResponse.content.substring(0, 500));
+    
     let workflow = claudeOptimizer.extractAndValidateJSON(
       claudeResponse.content
     );
+    console.log("📋 [GENERATE V2] JSON extracted successfully");
+    console.log("🔍 [DEBUG] Extracted workflow structure:", {
+      hasNodes: !!workflow.nodes,
+      nodeCount: workflow.nodes?.length || 0,
+      hasConnections: !!workflow.connections,
+      topLevelKeys: Object.keys(workflow)
+    });
 
-    // NEW: Validate that we got a proper workflow structure
-    if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
-      console.error("❌ Invalid workflow structure from AI:", workflow);
+    // 5. Validate AI workflow structure
+    const structureValidation = validateAIWorkflowStructure(workflow);
+    console.log("🔍 [GENERATE V2] Structure validation:", structureValidation);
+    
+    if (!structureValidation.valid) {
+      console.error("❌ Invalid workflow structure from AI:", structureValidation.errors);
       
-      // Check if we got node parameters at the top level (common error)
-      if (workflow.labelIds || workflow.parameters || workflow.includeAttachments) {
-        console.log("⚠️ AI returned node parameters instead of workflow. Attempting to reconstruct...");
-        
-        // Try to reconstruct a basic workflow structure
-        workflow = {
-          name: "Generated Workflow",
+      if (structureValidation.reconstructed) {
+        console.log("🔧 Using reconstructed workflow");
+        workflow = structureValidation.reconstructed;
+      } else {
+        // Try one more reconstruction attempt
+        console.log("⚠️ Attempting final reconstruction...");
+        workflow = reconstructWorkflowFromParams(workflow) || {
+          name: "Fallback Workflow",
           nodes: [{
             id: workflowFixer.generateNodeId(),
-            name: "Gmail Trigger",
-            type: "n8n-nodes-base.gmailTrigger",
+            name: "Manual Task",
+            type: "n8n-nodes-base.manualTrigger",
             typeVersion: 1,
             position: [250, 300],
-            parameters: {
-              labelIds: workflow.labelIds || ["INBOX"],
-              includeAttachments: workflow.includeAttachments || false
-            },
-            credentials: {
-              gmailOAuth2: {
-                id: "1",
-                name: "Gmail account"
-              }
-            }
+            parameters: {}
           }],
           connections: {},
-          settings: {
-            executionOrder: "v1"
-          }
+          settings: { executionOrder: "v1" }
         };
-      } else {
-        // Complete failure - return a minimal valid workflow
-        throw new Error("AI failed to generate a valid workflow structure");
       }
     }
 
-    // Also ensure workflow has required top-level fields
+    // 6. Ensure workflow has all required fields
     if (!workflow.name) workflow.name = "Generated Workflow";
     if (!workflow.nodes) workflow.nodes = [];
     if (!workflow.connections) workflow.connections = {};
     if (!workflow.settings) workflow.settings = { executionOrder: "v1" };
+    
+    console.log("🔍 [DEBUG] Workflow after structure validation:", {
+      name: workflow.name,
+      nodeCount: workflow.nodes.length,
+      nodes: workflow.nodes.map(n => ({ name: n.name, type: n.type }))
+    });
 
     // Debug logging before any fixes
     if (platform === "n8n") {
@@ -416,6 +554,7 @@ export async function POST(req) {
     }
 
     // 5. Fix platform-specific format issues
+    console.log("🔧 [GENERATE V2] Starting format fixes...");
     const fixStart = Date.now();
     let formatFixSuggestions = [];
     if (platform === "n8n") {
@@ -481,6 +620,7 @@ export async function POST(req) {
     timing.formatFixing = Date.now() - fixStart;
 
     // 6. NEW: Validate with n8n instance if enabled
+    console.log("🔍 [GENERATE V2] Starting n8n validation...");
     let n8nValidationResult = null;
     if (
       validateWithN8n &&
@@ -576,6 +716,7 @@ export async function POST(req) {
     }
 
     // 7. IMPORTANT: Clean the workflow to remove any metadata or non-standard fields
+    console.log("🧹 [GENERATE V2] Cleaning workflow for export...");
     const cleanedWorkflow = cleanWorkflowForExport(workflow, platform);
 
     // Verify the cleaned workflow still has the fixes
@@ -646,7 +787,7 @@ export async function POST(req) {
 
     // 10. Calculate metadata and timing
     timing.total = Date.now() - startTime;
-    const inputTokens = anthropicClient.estimateTokens(optimizedPrompt);
+    const inputTokens = anthropicClient.estimateTokens(enhancedPromptData.enhanced);
     const outputTokens = anthropicClient.estimateTokens(claudeResponse.content);
     const cost = anthropicClient.calculateCost(
       inputTokens,
@@ -726,6 +867,7 @@ export async function POST(req) {
     }
 
     // EMERGENCY FIX: Create a separate endpoint for copy functionality
+    console.log("📤 [GENERATE V2] Preparing response...");
     if (platform === "n8n") {
       console.log("🔧 Creating final importReadyWorkflow for client");
 
@@ -910,9 +1052,11 @@ export async function POST(req) {
       // Don't fail the request due to analytics errors
     }
 
+    console.log("✅ [GENERATE V2] Sending response");
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Generation error:", error);
+    console.error("❌ [GENERATE V2] Error:", error);
+    console.error("❌ [GENERATE V2] Stack:", error.stack);
 
     // Cleanup any test workflows if there was an error
     try {

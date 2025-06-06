@@ -11,10 +11,10 @@ export default function InputPanel({
   workflowPrompts,
 }) {
   const [input, setInput] = useState("");
-  const [platform, setPlatform] = useState("n8n");
-  const [complexity, setComplexity] = useState("moderate");
+  const [platform, setPlatform] = useState("all");
+  const [complexity, setComplexity] = useState("balanced");
   const [errorHandling, setErrorHandling] = useState(true);
-  const [optimization, setOptimization] = useState(50);
+  const [optimization, setOptimization] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredPrompts, setFilteredPrompts] = useState([]);
 
@@ -24,13 +24,7 @@ export default function InputPanel({
       setInput(selectedPrompt.prompt_text);
       // Auto-set complexity based on prompt
       if (selectedPrompt.complexity_level) {
-        // Map database complexity levels to UI values
-        const complexityMap = {
-          'simple': 'simple',
-          'moderate': 'moderate', 
-          'complex': 'complex'
-        };
-        setComplexity(complexityMap[selectedPrompt.complexity_level] || 'moderate');
+        setComplexity(selectedPrompt.complexity_level);
       }
     }
   }, [selectedPrompt]);
@@ -67,13 +61,7 @@ export default function InputPanel({
     setInput(prompt.prompt_text);
     setShowSuggestions(false);
     if (prompt.complexity_level) {
-      // Map database complexity levels to UI values
-      const complexityMap = {
-        'simple': 'simple',
-        'moderate': 'moderate', 
-        'complex': 'complex'
-      };
-      setComplexity(complexityMap[prompt.complexity_level] || 'moderate');
+      setComplexity(prompt.complexity_level);
     }
   };
 
@@ -150,9 +138,11 @@ export default function InputPanel({
             className="w-full p-2 bg-background border border-input rounded-md"
             disabled={isGenerating}
           >
-            <option value="n8n">n8n</option>
-            <option value="zapier">Zapier</option>
+            <option value="all">Auto-detect</option>
             <option value="make">Make (Integromat)</option>
+            <option value="zapier">Zapier</option>
+            <option value="n8n">n8n</option>
+            <option value="powerautomate">Power Automate</option>
           </select>
         </div>
 
@@ -168,16 +158,17 @@ export default function InputPanel({
             className="w-full p-2 bg-background border border-input rounded-md"
             disabled={isGenerating}
           >
-            <option value="simple">Simple - Basic linear flow</option>
-            <option value="moderate">Moderate - Some conditions and branches</option>
-            <option value="complex">Complex - Advanced logic and error handling</option>
+            <option value="basic">Basic - Simple linear flow</option>
+            <option value="balanced">Balanced - Some conditions</option>
+            <option value="moderate">Moderate - Multiple branches</option>
+            <option value="advanced">Advanced - Complex logic</option>
           </select>
         </div>
 
         {/* Options */}
         <div className="space-y-3">
           <label className="text-sm font-medium">Options</label>
-          <div className="space-y-3">
+          <div className="space-y-2">
             <label className="flex items-center space-x-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -188,25 +179,16 @@ export default function InputPanel({
               />
               <span className="text-sm">Include error handling</span>
             </label>
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Optimization Level: {optimization}%
-              </label>
+            <label className="flex items-center space-x-2 cursor-pointer">
               <input
-                type="range"
-                min="0"
-                max="100"
-                value={optimization}
-                onChange={(e) => setOptimization(parseInt(e.target.value))}
-                className="w-full"
+                type="checkbox"
+                checked={optimization}
+                onChange={(e) => setOptimization(e.target.checked)}
+                className="rounded border-input"
                 disabled={isGenerating}
               />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Basic</span>
-                <span>Optimized</span>
-              </div>
-            </div>
+              <span className="text-sm">Optimize for efficiency</span>
+            </label>
           </div>
         </div>
 

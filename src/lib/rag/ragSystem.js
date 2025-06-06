@@ -9,13 +9,23 @@ export class RAGSystem {
 
   async initialize() {
     if (this.initialized) return;
-
+    
+    console.log('🔧 [RAG] Starting initialization...');
+    
     try {
-      await this.store.initializeStore();
+      // Add timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('RAG initialization timeout')), 10000)
+      );
+      
+      const initPromise = this.store.initializeStore();
+      
+      await Promise.race([initPromise, timeoutPromise]);
+      
       this.initialized = true;
+      console.log('✅ [RAG] Initialization complete');
     } catch (error) {
-      console.error("RAGSystem initialization error:", error);
-      // Don't throw - allow system to work without RAG
+      console.error("❌ [RAG] Initialization error:", error);
       this.initialized = false;
     }
   }
