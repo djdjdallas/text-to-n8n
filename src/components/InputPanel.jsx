@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Button from "./ui/button";
 import Textarea from "./ui/Textarea";
+import styles from "@/app/dashboard/dashboard.module.css";
 
 const InputPanel = ({ onGenerate, isGenerating }) => {
   const [input, setInput] = useState("");
@@ -36,28 +37,28 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border p-4">
-        <h2 className="text-lg font-semibold">Natural Language Input</h2>
+      <div className={`flex items-center justify-between border-b border-border p-4 ${styles.panelHeader}`}>
+        <h2 className="text-lg font-semibold text-foreground">Natural Language Input</h2>
         <div className="flex space-x-4">
-          <Button variant="outline" size="sm" onClick={handleClear}>
+          <Button variant="outline" size="sm" onClick={handleClear} className={styles.outlineButton}>
             Clear
           </Button>
-          <Button variant="outline" size="sm" onClick={loadExample}>
+          <Button variant="outline" size="sm" onClick={loadExample} className={styles.outlineButton}>
             Load Example
           </Button>
         </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col flex-1">
-        <div className="flex-1 p-4">
+        <div className={`flex-1 p-4 ${styles.panelContent}`}>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Describe your automation workflow in plain English..."
-            className="h-full min-h-[200px] text-base"
+            className={`h-full min-h-[200px] text-base ${styles.inputTextarea}`}
             rows={20}
           />
-          <div className="mt-2 flex justify-between text-xs text-muted">
+          <div className={`mt-2 flex justify-between text-xs ${styles.textMuted}`}>
             <span>{characterCount} characters</span>
             <span>{wordCount} words</span>
           </div>
@@ -103,15 +104,15 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
           </button>
 
           {showAdvanced && (
-            <div className="space-y-4 rounded-md border border-border bg-card/50 p-4">
+            <div className={`space-y-4 ${styles.advancedPanel}`}>
               <div>
-                <label className="mb-1 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   Target Platform
                 </label>
                 <select
                   value={platform}
                   onChange={(e) => setPlatform(e.target.value)}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full text-sm ${styles.select}`}
                 >
                   <option value="n8n">n8n</option>
                   <option value="zapier">Zapier</option>
@@ -120,13 +121,13 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   Workflow Complexity
                 </label>
                 <select
                   value={complexity}
                   onChange={(e) => setComplexity(e.target.value)}
-                  className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  className={`w-full text-sm ${styles.select}`}
                 >
                   <option value="simple">Simple</option>
                   <option value="moderate">Moderate</option>
@@ -140,15 +141,15 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
                   id="error-handling"
                   checked={errorHandling}
                   onChange={(e) => setErrorHandling(e.target.checked)}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  className={`h-4 w-4 rounded ${styles.checkbox}`}
                 />
-                <label htmlFor="error-handling" className="ml-2 text-sm">
+                <label htmlFor="error-handling" className="ml-2 text-sm text-foreground">
                   Include Error Handling
                 </label>
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium">
+                <label className="mb-1 block text-sm font-medium text-foreground">
                   Optimization Level: {optimization}%
                 </label>
                 <input
@@ -157,7 +158,7 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
                   max="100"
                   value={optimization}
                   onChange={(e) => setOptimization(parseInt(e.target.value))}
-                  className="w-full"
+                  className="w-full accent-primary"
                 />
               </div>
             </div>
@@ -166,7 +167,7 @@ const InputPanel = ({ onGenerate, isGenerating }) => {
           <div className="mt-4">
             <Button
               type="submit"
-              className="w-full"
+              className={`w-full ${styles.primaryButton}`}
               size="lg"
               isLoading={isGenerating}
               disabled={input.trim() === ""}

@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from "react";
 import Button from "./ui/button";
 import Badge from "./ui/Badge";
+import { DynamicLoadingText } from "./DynamicLoadingText";
+import styles from "@/app/dashboard/dashboard.module.css";
 
 // Mock Monaco Editor component - in a real app, you'd use the actual Monaco Editor
 const MonacoEditor = ({ value, language }) => {
   return (
-    <pre className="h-full overflow-auto rounded-md bg-card/50 p-4 text-sm">
+    <pre className={`h-full overflow-auto rounded-md p-4 text-sm ${styles.codeBlock}`}>
       <code>{value}</code>
     </pre>
   );
 };
 
-const OutputPanel = ({ output, isGenerating, generationTime }) => {
+const OutputPanel = ({ output, isGenerating, generationTime, generationStartTime }) => {
   const [activeTab, setActiveTab] = useState("json");
   const [status, setStatus] = useState("idle"); // idle, success, error
 
@@ -177,29 +179,10 @@ const OutputPanel = ({ output, isGenerating, generationTime }) => {
         ) : (
           <div className="flex h-full items-center justify-center text-muted">
             {isGenerating ? (
-              <div className="flex flex-col items-center">
-                <svg
-                  className="mb-4 h-12 w-12 animate-spin text-primary"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                <p>Generating your workflow...</p>
-              </div>
+              <DynamicLoadingText 
+                isLoading={isGenerating} 
+                startTime={generationStartTime || Date.now()} 
+              />
             ) : (
               <div className="flex flex-col items-center text-center max-w-md mx-auto">
                 <svg
@@ -247,12 +230,12 @@ const OutputPanel = ({ output, isGenerating, generationTime }) => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border p-4 gap-3">
+      <div className={`flex flex-col sm:flex-row sm:items-center justify-between border-b border-border p-4 gap-3 ${styles.panelHeader}`}>
         <div className="flex items-center space-x-2">
-          <h2 className="text-lg font-semibold">Output</h2>
-          {status === "success" && <Badge variant="success">Generated</Badge>}
-          {isGenerating && <Badge>Generating...</Badge>}
-          {status === "error" && <Badge variant="error">Error</Badge>}
+          <h2 className="text-lg font-semibold text-foreground">Output</h2>
+          {status === "success" && <Badge variant="success" className={styles.badge}>Generated</Badge>}
+          {isGenerating && <Badge className={styles.badge}>Generating...</Badge>}
+          {status === "error" && <Badge variant="error" className={styles.badge}>Error</Badge>}
         </div>
 
         <div className="flex items-center space-x-3">
@@ -261,7 +244,7 @@ const OutputPanel = ({ output, isGenerating, generationTime }) => {
             size="sm"
             onClick={handleCopyJson}
             disabled={!output || isGenerating}
-            className="min-w-[130px] h-9"
+            className={`min-w-[130px] h-9 ${styles.outlineButton}`}
           >
             <svg
               width="16"
@@ -284,7 +267,7 @@ const OutputPanel = ({ output, isGenerating, generationTime }) => {
             size="sm"
             onClick={handleDownload}
             disabled={!output || isGenerating}
-            className="min-w-[90px] h-9"
+            className={`min-w-[90px] h-9 ${styles.outlineButton}`}
           >
             <svg
               width="16"
@@ -306,7 +289,7 @@ const OutputPanel = ({ output, isGenerating, generationTime }) => {
           <Button
             size="sm"
             disabled={!output || isGenerating}
-            className="min-w-[90px] h-9"
+            className={`min-w-[90px] h-9 ${styles.primaryButton}`}
           >
             <svg
               width="16"
@@ -334,25 +317,12 @@ const OutputPanel = ({ output, isGenerating, generationTime }) => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              className={`px-4 py-2 text-sm font-medium relative ${
-                activeTab === tab.id
-                  ? "text-primary"
-                  : "text-muted hover:text-foreground"
+              className={`px-4 py-2 text-sm font-medium ${styles.tabButton} ${
+                activeTab === tab.id ? styles.active : ""
               }`}
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.label}
-              {activeTab === tab.id && (
-                <span
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"
-                  style={{ bottom: "-1px" }}
-                >
-                  <span
-                    className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-2/3 h-0.5 bg-primary"
-                    style={{ height: "2px" }}
-                  ></span>
-                </span>
-              )}
             </button>
           ))}
         </nav>

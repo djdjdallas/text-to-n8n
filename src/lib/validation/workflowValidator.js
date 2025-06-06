@@ -482,6 +482,15 @@ class N8NValidator extends BaseValidator {
           { node: node.name }
         );
       }
+      
+      // Check for nested queryParameters structure
+      if (node.parameters?.queryParameters?.parameters) {
+        this.addError(
+          "INVALID_QUERYPARAMS_STRUCTURE",
+          `HTTP Request node ${node.name} has nested parameters in queryParameters`,
+          { node: node.name }
+        );
+      }
     }
 
     if (node.type === "n8n-nodes-base.if") {
@@ -491,11 +500,222 @@ class N8NValidator extends BaseValidator {
           `IF node ${node.name} missing conditions`,
           { node: node.name }
         );
+      } else {
+        // Validate IF node conditions structure
+        this.validateIfConditions(node);
       }
     }
-
+    
+    // Check Slack node for format issues
+    if (node.type === "n8n-nodes-base.slack") {
+      this.validateSlackNode(node);
+    }
+    
+    // Check Google Sheets node
+    if (node.type === "n8n-nodes-base.googleSheets") {
+      this.validateGoogleSheetsNode(node);
+    }
+    
+    // Check Set node
+    if (node.type === "n8n-nodes-base.set") {
+      this.validateSetNode(node);
+    }
+    
+    // Check OpenAI node
+    if (node.type === "n8n-nodes-base.openAi") {
+      this.validateOpenAINode(node);
+    }
+    
     // Check for expression syntax
     this.validateExpressions(node);
+  }
+  
+  /**
+   * Validate IF node conditions structure and formats
+   */
+  validateIfConditions(node) {
+    // Skip if conditions don't exist
+    if (!node.parameters?.conditions?.conditions) {
+      return;
+    }
+    
+    // Check if "number" field exists (invalid)
+    if (node.parameters.conditions.number !== undefined) {
+      this.addError(
+        "INVALID_IF_CONDITIONS",
+        `IF node ${node.name} has invalid 'number' field in conditions`,
+        { node: node.name }
+      );
+    }
+    
+    // Check individual conditions
+    node.parameters.conditions.conditions.forEach((condition, index) => {
+      // Check for complex expressions using JavaScript methods
+      if (typeof condition.leftValue === 'string' && 
+          condition.leftValue.includes('.includes(') && 
+          condition.operation === 'equal') {
+        this.addError(
+          "COMPLEX_EXPRESSION",
+          `IF node ${node.name} uses complex JavaScript method. Use 'contains' operation instead.`,
+          { node: node.name, condition: index }
+        );
+      }
+      
+      // Check for comparison to boolean true in complex expression
+      if (condition.rightValue === '{{true}}' || condition.rightValue === true) {
+        if (typeof condition.leftValue === 'string' && 
+            (condition.leftValue.includes('>') || condition.leftValue.includes('<'))) {
+          this.addError(
+            "COMPLEX_COMPARISON",
+            `IF node ${node.name} has complex comparison. Use direct comparison operations.`,
+            { node: node.name, condition: index }
+          );
+        }
+      }
+    });
+  }
+  
+  /**
+   * Validate Slack node format
+   */
+  validateSlackNode(node) {
+    // Check for required type version
+    if (!node.typeVersion || node.typeVersion < 2) {
+      this.addWarning(
+        "OUTDATED_SLACK_VERSION",
+        `Slack node ${node.name} should use typeVersion 2.2 or higher`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for otherOptions field which causes issues in newer n8n versions
+    if (node.parameters?.otherOptions) {
+      this.addWarning(
+        "DEPRECATED_SLACK_OPTIONS",
+        `Slack node ${node.name} has otherOptions field which may cause issues in newer n8n versions`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for equal sign prefix in text field
+    if (typeof node.parameters?.text === 'string' && node.parameters.text.startsWith('=')) {
+      this.addError(
+        "INVALID_TEXT_FORMAT",
+        `Slack node ${node.name} has text field with = prefix which will cause errors`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for channel format
+    if (node.parameters?.channel) {
+      if (node.parameters.channel.startsWith('=#')) {
+        this.addError(
+          "INVALID_CHANNEL_FORMAT",
+          `Slack node ${node.name} has invalid channel format with "=#" prefix`,
+          { node: node.name }
+        );
+      }
+      
+      if (node.parameters.channel === '={{$json.slackChannel}}' && !node.parameters.channel.startsWith('#')) {
+        this.addWarning(
+          "MISSING_CHANNEL_PREFIX",
+          `Slack node ${node.name} dynamic channel reference may need # prefix`,
+          { node: node.name }
+        );
+      }
+    }
+  }
+  
+  /**
+   * Validate Google Sheets node format
+   */
+  validateGoogleSheetsNode(node) {
+    // Check for options field
+    if (node.parameters?.options) {
+      this.addError(
+        "INVALID_GOOGLESHEETS_OPTIONS",
+        `Google Sheets node ${node.name} has options field which causes import errors`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for valueInputMode parameter
+    if (node.parameters?.valueInputMode) {
+      this.addError(
+        "INVALID_GOOGLESHEETS_PARAM",
+        `Google Sheets node ${node.name} has invalid valueInputMode parameter`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for complex reference object format that needs simplification
+    if (node.parameters?.documentId && typeof node.parameters.documentId === 'object') {
+      this.addError(
+        "COMPLEX_GOOGLESHEETS_REF",
+        `Google Sheets node ${node.name} has complex documentId reference that needs simplification`,
+        { node: node.name }
+      );
+    }
+  }
+  
+  /**
+   * Validate Set node format
+   */
+  validateSetNode(node) {
+    // Check for options field
+    if (node.parameters?.options) {
+      this.addError(
+        "INVALID_SET_OPTIONS",
+        `Set node ${node.name} has options field which should be removed`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for keepOnlySet parameter
+    if (node.parameters?.keepOnlySet !== undefined) {
+      this.addError(
+        "INVALID_SET_PARAM",
+        `Set node ${node.name} has keepOnlySet parameter which causes import issues`,
+        { node: node.name }
+      );
+    }
+    
+    // Check for improper typeVersion
+    if (node.typeVersion !== 1) {
+      this.addWarning(
+        "INCORRECT_SET_VERSION",
+        `Set node ${node.name} should have typeVersion 1`,
+        { node: node.name }
+      );
+    }
+  }
+  
+  /**
+   * Validate OpenAI node format
+   */
+  validateOpenAINode(node) {
+    // Check for options field with model parameters that should be at root
+    if (node.parameters?.options) {
+      const criticalParams = ['model', 'temperature', 'maxTokens', 'max_tokens'];
+      let hasCriticalParams = false;
+      
+      criticalParams.forEach(param => {
+        if (node.parameters.options[param] !== undefined) {
+          hasCriticalParams = true;
+          this.addError(
+            "INVALID_OPENAI_STRUCTURE",
+            `OpenAI node ${node.name} has ${param} in options object instead of at root level`,
+            { node: node.name, param }
+          );
+        }
+      });
+      
+      if (hasCriticalParams) {
+        this.addSuggestion(
+          `Move OpenAI parameters out of options object to root level in node ${node.name}`
+        );
+      }
+    }
   }
 
   validateExpressions(node) {

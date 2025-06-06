@@ -1,0 +1,573 @@
+
+> ai-automation@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.3.3
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.161:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1410ms
+ ○ Compiling /api/generate/v2 ...
+ ✓ Compiled /api/generate/v2 in 1224ms (902 modules)
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+🔧 Applying n8n format fixes...
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+Fixed mixed expression syntax in Set node value: message
+ℹ️ Processed Slack node "Send to Slack" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: errorMessage
+Fixed mixed expression syntax in Set node value: message
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Check VIP Email (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"headers\"][\"from\"]}}",
+        "rightValue": "vip@company.com",
+        "operation": "contains"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Prepare Slack Message (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "message",
+        "value": "🔴 VIP EMAIL RECEIVED 🔴\n\nFrom: {{$json[\"headers\"][\"from\"]}}\nSubject: {{$json[\"headers\"][\"subject\"]}}\n\nMessage:\n{{$json[\"textPlain\"] || \"No text content\"}}"
+      }
+    ]
+  }
+}
+
+Node 3: Send to Slack (n8n-nodes-base.slack)
+Parameters: {
+  "authentication": "accessToken",
+  "operation": "post",
+  "channel": "#vip-notifications",
+  "text": "{{$json.message}}"
+}
+
+Node 4: Slack Error Handler (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "errorMessage",
+        "value": "Error sending VIP email to Slack: {{$json.error}}"
+      }
+    ]
+  }
+}
+
+Node 5: Log Error (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "error"
+      },
+      {
+        "name": "message",
+        "value": "{{$json.errorMessage || \"Unknown error occurred\"}}"
+      }
+    ]
+  }
+}
+
+Node 6: Not VIP Email (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "skipped"
+      },
+      {
+        "name": "message",
+        "value": "Email not from VIP sender"
+      }
+    ]
+  }
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Check VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Check VIP Email": {
+    "main": [
+      [
+        {
+          "node": "Prepare Slack Message",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Not VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Prepare Slack Message": {
+    "main": [
+      [
+        {
+          "node": "Send to Slack",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send to Slack": {
+    "main": [
+      [
+        {
+          "node": "Slack Error Handler",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Slack Error Handler": {
+    "main": [
+      [
+        {
+          "node": "Log Error",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, suggestions
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["headers"]["from"]}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  * Slack node Send to Slack: no otherOptions field found (good)
+⚠️ Removing non-allowed field from workflow: suggestions
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["headers"]["from"]}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+✅ Fixed Gmail credentials for node "Gmail Trigger" in final workflow
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail VIP Email to Slack",
+  "nodes": [
+    {
+      "id": "gmailTrigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "positi...
+ POST /api/generate/v2 200 in 28718ms
+Server error 529. Retrying (attempt 1)
+ POST /api/generate/v2 200 in 29989ms
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount
+🔧 Applying n8n format fixes...
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+Fixed mixed expression syntax in Set node value: message
+ℹ️ Processed Slack node "Send to Slack" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: errorDetails
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Check VIP Email (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"headers\"][\"from\"]}}",
+        "rightValue": "vip@company.com",
+        "operation": "contains"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Prepare Slack Message (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "message",
+        "value": "🔴 VIP EMAIL RECEIVED 🔴\n\nFrom: {{$json[\"headers\"][\"from\"]}}\nSubject: {{$json[\"headers\"][\"subject\"]}}\n\nMessage:\n{{$json[\"textPlain\"] || \"No text content\"}}"
+      }
+    ]
+  }
+}
+
+Node 3: Send to Slack (n8n-nodes-base.slack)
+Parameters: {
+  "authentication": "accessToken",
+  "operation": "post",
+  "channel": "#vip-notifications",
+  "text": "{{$json.message}}"
+}
+
+Node 4: Slack Success (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "success"
+      },
+      {
+        "name": "message",
+        "value": "VIP email successfully sent to Slack"
+      }
+    ]
+  }
+}
+
+Node 5: Slack Error (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "error"
+      },
+      {
+        "name": "message",
+        "value": "Failed to send VIP email to Slack"
+      },
+      {
+        "name": "errorDetails",
+        "value": "{{$json.error}}"
+      }
+    ]
+  }
+}
+
+Node 6: Not VIP Email (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "skipped"
+      },
+      {
+        "name": "message",
+        "value": "Email not from VIP sender"
+      }
+    ]
+  }
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Check VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Check VIP Email": {
+    "main": [
+      [
+        {
+          "node": "Prepare Slack Message",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Not VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Prepare Slack Message": {
+    "main": [
+      [
+        {
+          "node": "Send to Slack",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send to Slack": {
+    "main": [
+      [
+        {
+          "node": "Slack Success",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "error": [
+      [
+        {
+          "node": "Slack Error",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Slack Success": {
+    "main": [
+      []
+    ]
+  },
+  "Slack Error": {
+    "main": [
+      []
+    ]
+  },
+  "Not VIP Email": {
+    "main": [
+      []
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount, suggestions
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["headers"]["from"]}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  * Slack node Send to Slack: no otherOptions field found (good)
+⚠️ Removing non-allowed field from workflow: suggestions
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["headers"]["from"]}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+✅ Fixed Gmail credentials for node "Gmail Trigger" in final workflow
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail VIP Email to Slack",
+  "nodes": [
+    {
+      "id": "gmailTrigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "positi...
+ ✓ Compiled /middleware in 352ms (248 modules)
+Middleware session check: {
+  path: '/dashboard',
+  hasSession: true,
+  userId: 'd793c480-f6f8-4e5e-8630-05f16d533687',
+  emailConfirmed: true
+}
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1461ms (909 modules)
+ GET /dashboard 200 in 1614ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 711ms (913 modules)
+ GET /_next/static/chunks/main-app.js?v=1749169253503 404 in 790ms
+Middleware session check: {
+  path: '/dashboard',
+  hasSession: true,
+  userId: 'd793c480-f6f8-4e5e-8630-05f16d533687',
+  emailConfirmed: true
+}
+ GET /dashboard 200 in 54ms
+ GET /_next/static/chunks/main-app.js?v=1749169265032 404 in 26ms
+Middleware session check: {
+  path: '/',
+  hasSession: true,
+  userId: 'd793c480-f6f8-4e5e-8630-05f16d533687',
+  emailConfirmed: true
+}
+ ○ Compiling / ...
+ ✓ Compiled / in 585ms (1012 modules)
+ GET / 200 in 797ms
+ GET /_next/static/chunks/main-app.js?v=1749169268653 404 in 47ms
+ ✓ Compiled in 1508ms (430 modules)
+ ✓ Compiled in 1283ms (430 modules)
+ ✓ Compiled in 708ms (430 modules)
+ ✓ Compiled in 1386ms (430 modules)
+ ✓ Compiled in 206ms (430 modules)
+ ✓ Compiled in 390ms (430 modules)
+ ✓ Compiled in 224ms (430 modules)
+ ✓ Compiled in 339ms (430 modules)
+ ✓ Compiled in 335ms (430 modules)
+ ✓ Compiled in 197ms (430 modules)
+ ✓ Compiled in 380ms (664 modules)
+ ✓ Compiled in 284ms (430 modules)
+ ✓ Compiled in 976ms (430 modules)
+ ✓ Compiled in 244ms (430 modules)
+ ✓ Compiled in 234ms (430 modules)
+ ✓ Compiled in 138ms (430 modules)
+ ✓ Compiled in 128ms (430 modules)
+ ✓ Compiled in 204ms (430 modules)
+ ✓ Compiled in 224ms (430 modules)
+ ✓ Compiled in 236ms (430 modules)
+ ✓ Compiled in 202ms (430 modules)
+ ✓ Compiled in 243ms (430 modules)
+ ✓ Compiled in 397ms (430 modules)
+ ✓ Compiled in 229ms (430 modules)
+ ✓ Compiled in 251ms (430 modules)
+ ✓ Compiled in 446ms (678 modules)
+ ✓ Compiled in 187ms (430 modules)
+ ✓ Compiled in 200ms (430 modules)
+ ✓ Compiled in 301ms (430 modules)
+ ✓ Compiled in 427ms (430 modules)
+ ✓ Compiled in 343ms (437 modules)
+ ✓ Compiled in 273ms (437 modules)
+ ✓ Compiled in 238ms (437 modules)
+[Error: Cannot apply unknown utility class `bg-background`. Are you using CSS modules or similar and missing `@reference`? https://tailwindcss.com/docs/functions-and-directives#reference-directive]
+ ✓ Compiled in 176ms (448 modules)
+ ✓ Compiled in 163ms (439 modules)
+ ✓ Compiled in 341ms (439 modules)
+ ✓ Compiled in 314ms (439 modules)
+ ✓ Compiled in 239ms (439 modules)
+ ✓ Compiled in 246ms (439 modules)
+ ✓ Compiled in 214ms (439 modules)
+ ✓ Compiled in 373ms (439 modules)
+ ✓ Compiled in 199ms (439 modules)
+ ✓ Compiled in 350ms (439 modules)
+ ✓ Compiled in 261ms (439 modules)
+[Error: Cannot apply unknown utility class `bg-background`. Are you using CSS modules or similar and missing `@reference`? https://tailwindcss.com/docs/functions-and-directives#reference-directive]
+ ✓ Compiled in 240ms (448 modules)
+ ✓ Compiled in 183ms (442 modules)
+ ✓ Compiled in 318ms (442 modules)
+ ✓ Compiled in 236ms (442 modules)
+ ✓ Compiled in 364ms (442 modules)
+ ✓ Compiled in 224ms (442 modules)
+ ✓ Compiled in 194ms (442 modules)
+ ✓ Compiled in 158ms (442 modules)
+ ✓ Compiled in 228ms (442 modules)
+ ✓ Compiled in 267ms (442 modules)

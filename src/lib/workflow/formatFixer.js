@@ -97,14 +97,260 @@ export class WorkflowFormatFixer {
   }
 
   /**
+   * Fix expression syntax across all nodes
+   */
+  fixExpressionSyntax(workflow) {
+    if (!workflow.nodes) return;
+    
+    console.log("🔧 Running expression syntax fix...");
+    
+    workflow.nodes.forEach(node => {
+      // Fix IF node expressions
+      if (node.type === 'n8n-nodes-base.if' && node.parameters?.conditions?.conditions) {
+        node.parameters.conditions.conditions = node.parameters.conditions.conditions.map(condition => {
+          if (condition.leftValue && typeof condition.leftValue === 'string') {
+            const before = condition.leftValue;
+            // For 'from' field and other common fields, use cleaner dot notation
+            if (condition.leftValue === '={{$json["from"]}}') {
+              condition.leftValue = '={{$json.from}}';
+            } else if (condition.leftValue === '={{$json["subject"]}}') {
+              condition.leftValue = '={{$json.subject}}';
+            } else if (condition.leftValue === '={{$json["email"]}}') {
+              condition.leftValue = '={{$json.email}}';
+            } else {
+              // General pattern replacement for escaped quotes
+              condition.leftValue = condition.leftValue
+                .replace(/\{\{\$json\[\\?"(\w+)\\?"\]\}\}/g, '{{$json.$1}}')
+                .replace(/\{\{\$json\["(\w+)"\]\}\}/g, '{{$json.$1}}')
+                .replace(/\{\{\$json\['(\w+)'\]\}\}/g, '{{$json.$1}}');
+            }
+            if (before !== condition.leftValue) {
+              console.log(`  ✅ Fixed IF expression: ${before} → ${condition.leftValue}`);
+            }
+          }
+          return condition;
+        });
+      }
+      
+      // Fix Slack node text expressions
+      if (node.type === 'n8n-nodes-base.slack' && node.parameters?.text) {
+        const before = node.parameters.text;
+        node.parameters.text = this.fixExpressionString(node.parameters.text);
+        if (before !== node.parameters.text) {
+          console.log(`  ✅ Fixed Slack expression: ${before.substring(0, 50)}...`);
+        }
+      }
+      
+      // Fix Set node value expressions
+      if (node.type === 'n8n-nodes-base.set' && node.parameters?.values?.string) {
+        node.parameters.values.string = node.parameters.values.string.map(item => {
+          if (item.value && typeof item.value === 'string' && item.value.includes('{{')) {
+            const before = item.value;
+            item.value = this.fixExpressionString(item.value);
+            if (before !== item.value) {
+              console.log(`  ✅ Fixed Set node expression: ${before} → ${item.value}`);
+            }
+          }
+          return item;
+        });
+      }
+
+      // Fix any other expression fields in parameters recursively
+      this.fixNodeExpressions(node.parameters);
+    });
+  }
+
+  /**
+   * Fix expression string by replacing escaped quotes and complex patterns
+   */
+  fixExpressionString(text) {
+    if (!text || typeof text !== 'string') return text;
+    
+    // Replace common patterns with cleaner dot notation
+    return text
+      .replace(/\{\{\$json\[\\?"(\w+)\\?"\]\}\}/g, '{{$json.$1}}')
+      .replace(/\{\{\$json\["(\w+)"\]\}\}/g, '{{$json.$1}}')
+      .replace(/\{\{\$json\['(\w+)'\]\}\}/g, '{{$json.$1}}');
+  }
+
+  /**
+   * Recursively fix expressions in node parameters
+   */
+  fixNodeExpressions(obj) {
+    if (!obj || typeof obj !== 'object') return;
+
+    for (const key in obj) {
+      if (typeof obj[key] === 'string' && obj[key].includes('{{')) {
+        obj[key] = this.fixExpressionString(obj[key]);
+      } else if (typeof obj[key] === 'object') {
+        this.fixNodeExpressions(obj[key]);
+      }
+    }
+  }
+
+  /**
+   * Fix Gmail field references to match actual n8n output
+   */
+  fixGmailFieldReferences(workflow) {
+    if (!workflow.nodes) return;
+    
+    console.log("🔧 Fixing Gmail field references...");
+    
+    // Check if workflow has a Gmail trigger
+    const hasGmailTrigger = workflow.nodes.some(n => 
+      n.type === 'n8n-nodes-base.gmailTrigger' || 
+      n.type === 'n8n-nodes-base.gmail'
+    );
+    
+    if (!hasGmailTrigger) {
+      console.log("  ❌ No Gmail trigger found, skipping Gmail field fixes");
+      return;
+    }
+    
+    console.log("  ✅ Gmail trigger found, applying field reference fixes");
+    
+    workflow.nodes.forEach(node => {
+      // Function to fix Gmail field references in text
+      const fixGmailFields = (text) => {
+        if (!text || typeof text !== 'string') return text;
+        
+        return text
+          // Fix 'from' references
+          .replace(/\{\{\$json\.from\}\}/g, '{{$json["headers"]["from"]}}')
+          .replace(/\{\{\$json\["from"\]\}\}/g, '{{$json["headers"]["from"]}}')
+          .replace(/\{\{\$json\['from'\]\}\}/g, '{{$json["headers"]["from"]}}')
+          // Fix 'subject' references
+          .replace(/\{\{\$json\.subject\}\}/g, '{{$json["headers"]["subject"]}}')
+          .replace(/\{\{\$json\["subject"\]\}\}/g, '{{$json["headers"]["subject"]}}')
+          .replace(/\{\{\$json\['subject'\]\}\}/g, '{{$json["headers"]["subject"]}}')
+          // Fix 'text' or 'body' references
+          .replace(/\{\{\$json\.text\}\}/g, '{{$json["textPlain"]}}')
+          .replace(/\{\{\$json\["text"\]\}\}/g, '{{$json["textPlain"]}}')
+          .replace(/\{\{\$json\.body\}\}/g, '{{$json["textPlain"]}}')
+          .replace(/\{\{\$json\["body"\]\}\}/g, '{{$json["textPlain"]}}')
+          // Fix 'email' references (commonly used for from field)
+          .replace(/\{\{\$json\.email\}\}/g, '{{$json["headers"]["from"]}}')
+          .replace(/\{\{\$json\["email"\]\}\}/g, '{{$json["headers"]["from"]}}')
+          .replace(/\{\{\$json\['email'\]\}\}/g, '{{$json["headers"]["from"]}}');
+      };
+      
+      // Fix IF node conditions
+      if (node.type === 'n8n-nodes-base.if' && node.parameters?.conditions?.conditions) {
+        node.parameters.conditions.conditions = node.parameters.conditions.conditions.map(condition => {
+          if (condition.leftValue) {
+            const before = condition.leftValue;
+            condition.leftValue = fixGmailFields(condition.leftValue);
+            if (before !== condition.leftValue) {
+              console.log(`    ✅ Fixed Gmail field in IF: ${before} → ${condition.leftValue}`);
+            }
+          }
+          if (condition.rightValue && typeof condition.rightValue === 'string' && condition.rightValue.includes('{{')) {
+            const before = condition.rightValue;
+            condition.rightValue = fixGmailFields(condition.rightValue);
+            if (before !== condition.rightValue) {
+              console.log(`    ✅ Fixed Gmail field in IF rightValue: ${before} → ${condition.rightValue}`);
+            }
+          }
+          return condition;
+        });
+      }
+      
+      // Fix Slack node text
+      if (node.type === 'n8n-nodes-base.slack' && node.parameters?.text) {
+        const before = node.parameters.text;
+        node.parameters.text = fixGmailFields(node.parameters.text);
+        if (before !== node.parameters.text) {
+          console.log(`    ✅ Fixed Gmail fields in Slack text: ${before.substring(0, 30)}...`);
+        }
+      }
+      
+      // Fix Set node values
+      if (node.type === 'n8n-nodes-base.set' && node.parameters?.values?.string) {
+        node.parameters.values.string = node.parameters.values.string.map(item => {
+          if (item.value && typeof item.value === 'string') {
+            const before = item.value;
+            item.value = fixGmailFields(item.value);
+            if (before !== item.value) {
+              console.log(`    ✅ Fixed Gmail field in Set node: ${item.name}`);
+            }
+          }
+          return item;
+        });
+      }
+      
+      // Fix Google Sheets node column mappings
+      if (node.type === 'n8n-nodes-base.googleSheets' && node.parameters?.columns?.value) {
+        for (const [column, value] of Object.entries(node.parameters.columns.value)) {
+          if (typeof value === 'string' && value.includes('{{')) {
+            const before = value;
+            node.parameters.columns.value[column] = fixGmailFields(value);
+            if (before !== node.parameters.columns.value[column]) {
+              console.log(`    ✅ Fixed Gmail field in Sheets column ${column}`);
+            }
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Ensure workflow has all expected fields with proper defaults
+   */
+  ensureWorkflowCompleteness(workflow) {
+    // Ensure all standard fields exist
+    if (!workflow.name) workflow.name = "Generated Workflow";
+    if (!workflow.nodes) workflow.nodes = [];
+    if (!workflow.connections) workflow.connections = {};
+    if (!workflow.settings) workflow.settings = {};
+    if (!workflow.settings.executionOrder) workflow.settings.executionOrder = "v1";
+    if (!workflow.meta) workflow.meta = {};
+    if (!workflow.meta.instanceId) workflow.meta.instanceId = this.generateInstanceId();
+    
+    // Add these fields with proper values
+    if (workflow.versionId === undefined) workflow.versionId = this.generateVersionId();
+    if (workflow.pinData === undefined) workflow.pinData = {};
+    if (workflow.staticData === undefined) workflow.staticData = null;
+    if (workflow.tags === undefined) workflow.tags = [];
+    if (workflow.active === undefined) workflow.active = false;
+    
+    // Ensure settings has all expected properties
+    if (workflow.settings.saveExecutionProgress === undefined) {
+      workflow.settings.saveExecutionProgress = false;
+    }
+    if (workflow.settings.saveManualExecutions === undefined) {
+      workflow.settings.saveManualExecutions = true;
+    }
+    if (workflow.settings.saveDataErrorExecution === undefined) {
+      workflow.settings.saveDataErrorExecution = "all";
+    }
+    if (workflow.settings.saveDataSuccessExecution === undefined) {
+      workflow.settings.saveDataSuccessExecution = "all";
+    }
+    if (workflow.settings.executionTimeout === undefined) {
+      workflow.settings.executionTimeout = -1;
+    }
+    if (workflow.settings.timezone === undefined) {
+      workflow.settings.timezone = "America/New_York";
+    }
+  }
+
+  /**
    * Fix n8n workflow format issues
    */
   fixN8nWorkflow(workflow) {
-    // Debug logging
     console.log("🔧 formatFixer.fixN8nWorkflow called!");
     
     // Create a copy to avoid mutations
     const fixed = JSON.parse(JSON.stringify(workflow));
+
+    // NEW: Fix expression syntax first
+    this.fixExpressionSyntax(fixed);
+    
+    // NEW: Fix Gmail field references to match actual output
+    this.fixGmailFieldReferences(fixed);
+    
+    // NEW: Ensure workflow completeness
+    this.ensureWorkflowCompleteness(fixed);
 
     // 0. Remove NoOp nodes before processing
     this.removeNoOpNodes(fixed);
@@ -254,13 +500,17 @@ export class WorkflowFormatFixer {
     // 8. Aggressively remove ALL options fields (more reliable)
     this.removeAllOptionsFields(fixed);
 
-    // 8.5. Re-add otherOptions for Slack nodes (must be after removal)
-    console.log("🔧 Re-adding otherOptions to Slack nodes after options removal");
+    // 8.5. Make sure Slack nodes do NOT have otherOptions - they cause import errors in n8n v1.0+
+    console.log("🔧 Ensuring Slack nodes don't have otherOptions field");
     fixed.nodes?.forEach(node => {
       if (node.type === 'n8n-nodes-base.slack') {
         if (!node.parameters) node.parameters = {};
-        node.parameters.otherOptions = {};
-        console.log(`✅ Re-added otherOptions to Slack node "${node.name}"`);
+        
+        // Make sure otherOptions is removed - it's NOT needed in n8n v1.0+
+        if (node.parameters.otherOptions) {
+          delete node.parameters.otherOptions;
+          console.log(`✅ Removed otherOptions from Slack node "${node.name}"`);
+        }
       }
     });
 
@@ -272,6 +522,9 @@ export class WorkflowFormatFixer {
 
     // 11. Generate node replacement suggestions
     fixed.suggestions = this.suggestNodeReplacements(fixed);
+
+    // Add debug method for detailed structure inspection
+    this.debugWorkflowStructure(fixed);
 
     // Debug logging to confirm completion
     console.log("✅ formatFixer.fixN8nWorkflow completed!");
@@ -522,18 +775,49 @@ export class WorkflowFormatFixer {
       node.parameters.authentication = "accessToken";
     }
 
-    // Fix channel format - ensure it starts with #
-    if (node.parameters.channel && !node.parameters.channel.startsWith("#")) {
-      if (node.parameters.channel.match(/^[CG][A-Z0-9]+$/)) {
-        // It's a channel ID, replace with placeholder
-        node.parameters.channel = "#general";
-      } else {
-        node.parameters.channel = "#" + node.parameters.channel;
+    // Fix channel format issues
+    if (node.parameters.channel) {
+      // Remove any expression prefix if the channel already has # symbol
+      if (node.parameters.channel.includes("#=")) {
+        node.parameters.channel = node.parameters.channel.replace("#=", "");
+      }
+      
+      // Fix channel references that use expressions
+      if (node.parameters.channel.startsWith("=")) {
+        // Handle "#={{$json.slackChannel}}" format
+        if (node.parameters.channel.startsWith("=#")) {
+          node.parameters.channel = node.parameters.channel.substring(1); // Remove = but keep #
+        }
+        // Handle "={{$json.slackChannel}}" format
+        else {
+          const expression = node.parameters.channel.substring(1);
+          
+          // Check if the expression itself might contain a # already
+          if (expression.includes("#")) {
+            node.parameters.channel = expression;
+          } else if (expression.includes("{{") && expression.includes("}}")) {
+            // This is a valid expression, just remove the = prefix
+            node.parameters.channel = expression;
+          } else {
+            // Add # if missing and not an expression
+            node.parameters.channel = "#" + expression;
+          }
+        }
+      }
+      // Handle static channel names without # prefix
+      else if (!node.parameters.channel.startsWith("#") && 
+               !node.parameters.channel.match(/^\{\{.*\}\}$/)) {
+        if (node.parameters.channel.match(/^[CG][A-Z0-9]+$/)) {
+          // It's a channel ID, replace with placeholder
+          node.parameters.channel = "#general";
+        } else {
+          node.parameters.channel = "#" + node.parameters.channel;
+        }
       }
     }
     
     // Fix text field - remove "=" prefix if it exists
-    if (node.parameters.text && node.parameters.text.startsWith("=")) {
+    if (node.parameters.text && typeof node.parameters.text === 'string' && node.parameters.text.startsWith("=")) {
       node.parameters.text = node.parameters.text.substring(1);
     }
     
@@ -541,10 +825,19 @@ export class WorkflowFormatFixer {
     if (node.parameters.blocks && typeof node.parameters.blocks === 'string' && node.parameters.blocks.startsWith("=")) {
       node.parameters.blocks = node.parameters.blocks.substring(1);
     }
+    
+    // Fix attachments field if it exists
+    if (node.parameters.attachments && typeof node.parameters.attachments === 'string' && node.parameters.attachments.startsWith("=")) {
+      node.parameters.attachments = node.parameters.attachments.substring(1);
+    }
+    
+    // Remove otherOptions completely - it's not needed in n8n v1.0+
+    if (node.parameters.otherOptions) {
+      delete node.parameters.otherOptions;
+      console.log(`✅ Removed otherOptions from Slack node "${node.name}"`);
+    }
 
-    // Log the initial Slack node fix - but the actual fix happens later
-    // after removeAllOptionsFields runs (see re-adding step at the end of fixN8nWorkflow)
-    console.log(`ℹ️ Initial Slack node "${node.name}" processing - otherOptions will be added later`);
+    console.log(`ℹ️ Processed Slack node "${node.name}" - ensured no otherOptions field`);
   }
 
   /**
@@ -579,7 +872,7 @@ export class WorkflowFormatFixer {
         ];
       }
 
-      // NEW: Remove invalid "string" field if both exist
+      // Remove invalid "string" field if both exist
       if (node.parameters.conditions.string && node.parameters.conditions.conditions) {
         delete node.parameters.conditions.string;
       }
@@ -598,13 +891,69 @@ export class WorkflowFormatFixer {
 
             // Fix empty leftValue
             if (!fixedCondition.leftValue || fixedCondition.leftValue === "") {
-              fixedCondition.leftValue = '={{$json["field"]}}';
+              fixedCondition.leftValue = '={{$json["email"]}}';
             }
-
-            // NEW: Fix field references in conditions
-            if (fixedCondition.leftValue === '={{$json["field"]}}') {
-              // Try to infer the correct field from context
-              fixedCondition.leftValue = '={{$json["email"]}}'; // Common case
+            
+            // Convert complex boolean expressions to simpler ones
+            if (typeof fixedCondition.leftValue === 'string') {
+              // Handle includes() method - convert to contains operation
+              if (fixedCondition.leftValue.includes('.includes(')) {
+                const matchResult = fixedCondition.leftValue.match(/\{\{([^}]+)\.includes\(['"](.*)['"]\)\}\}/);
+                if (matchResult && matchResult.length >= 3) {
+                  fixedCondition.leftValue = `={{${matchResult[1]}}}`;
+                  fixedCondition.rightValue = matchResult[2];
+                  fixedCondition.operation = "contains";
+                }
+              }
+              
+              // Handle comparison to boolean literals with equals
+              if (fixedCondition.operation === "equal" && 
+                  fixedCondition.rightValue === "{{true}}" &&
+                  fixedCondition.leftValue.includes('>') || 
+                  fixedCondition.leftValue.includes('<') ||
+                  fixedCondition.leftValue.includes('===') ||
+                  fixedCondition.leftValue.includes('!==')) {
+                
+                // Extract the actual comparison from leftValue
+                const valuePattern = /\{\{(.+?)\}\}/;
+                const match = fixedCondition.leftValue.match(valuePattern);
+                if (match && match[1]) {
+                  // Extract the parts of the comparison
+                  const comparisonStr = match[1];
+                  
+                  // For array length comparisons
+                  if (comparisonStr.includes('.length')) {
+                    const lengthMatch = comparisonStr.match(/\$json(?:\[['"](.+?)['"]\])?\.length\s*([><=!]+)\s*(\d+)/);
+                    if (lengthMatch) {
+                      const [_, field, operator, value] = lengthMatch;
+                      
+                      if (field) {
+                        fixedCondition.leftValue = `={{$json["${field}"].length}}`;
+                      } else {
+                        fixedCondition.leftValue = `={{$json.length}}`;
+                      }
+                      
+                      if (operator === '>' || operator === '>=') {
+                        fixedCondition.operation = "largerThan";
+                        fixedCondition.rightValue = parseInt(value) - 1;  // Adjust for largerThan vs >=
+                      } else if (operator === '<' || operator === '<=') {
+                        fixedCondition.operation = "smallerThan";
+                        fixedCondition.rightValue = parseInt(value) + 1;  // Adjust for smallerThan vs <=
+                      } else {
+                        fixedCondition.operation = "equal";
+                        fixedCondition.rightValue = parseInt(value);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+            // Handle boolean values to ensure they're not strings
+            if (fixedCondition.rightValue === "true" || fixedCondition.rightValue === "{{true}}") {
+              fixedCondition.rightValue = true;
+            } else if (fixedCondition.rightValue === "false" || fixedCondition.rightValue === "{{false}}") {
+              fixedCondition.rightValue = false;
             }
             
             // Handle "exists" operation - it should have empty rightValue
@@ -1153,8 +1502,30 @@ export class WorkflowFormatFixer {
       };
     }
     
+    // Fix expression syntax
+    this.fixSetNodeExpressions(node);
+    
     // Ensure typeVersion is 1 for set nodes
     node.typeVersion = 1;
+  }
+  
+  /**
+   * Fix Set node expression syntax
+   */
+  fixSetNodeExpressions(node) {
+    if (!node.parameters?.values?.string) return;
+    
+    node.parameters.values.string = node.parameters.values.string.map(item => {
+      if (item.value && typeof item.value === 'string') {
+        // If value starts with = and contains {{, fix the syntax
+        if (item.value.startsWith('=') && item.value.includes('{{')) {
+          // Remove the = prefix and let n8n handle it as a template string
+          item.value = item.value.substring(1);
+          console.log(`Fixed mixed expression syntax in Set node value: ${item.name}`);
+        }
+      }
+      return item;
+    });
   }
 
   /**
@@ -1400,6 +1771,19 @@ export class WorkflowFormatFixer {
         }
       );
     }
+  }
+
+  /**
+   * Debug workflow structure to identify issues
+   */
+  debugWorkflowStructure(workflow) {
+    console.log("🔍 Detailed workflow structure:");
+    workflow.nodes?.forEach((node, i) => {
+      console.log(`\nNode ${i}: ${node.name} (${node.type})`);
+      console.log("Parameters:", JSON.stringify(node.parameters, null, 2));
+    });
+    console.log("\nConnections:", JSON.stringify(workflow.connections, null, 2));
+    console.log("\nSettings:", JSON.stringify(workflow.settings, null, 2));
   }
 
   /**

@@ -6,12 +6,14 @@ import InputPanel from "@/components/InputPanel";
 import OutputPanel from "@/components/OutputPanel";
 import BottomPanel from "@/components/BottomPanel";
 import { API_ENDPOINTS } from "@/lib/constants";
+import styles from './dashboard.module.css';
 
 export default function Dashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [output, setOutput] = useState(null);
+  const [generationStartTime, setGenerationStartTime] = useState(null);
   const [metrics, setMetrics] = useState({
     tokens: 0,
     complexity: 0,
@@ -33,8 +35,9 @@ export default function Dashboard() {
     try {
       setIsGenerating(true);
       setOutput(null);
-
+      
       const startTime = Date.now();
+      setGenerationStartTime(startTime);
 
       // Use V2 endpoint
       const response = await fetch("/api/generate/v2", {
@@ -115,27 +118,29 @@ export default function Dashboard() {
       });
     } finally {
       setIsGenerating(false);
+      setGenerationStartTime(null);
     }
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={`flex h-full flex-col ${styles.dashboardContainer}`}>
       <main className="flex flex-1 overflow-hidden">
         <Sidebar isCollapsed={sidebarCollapsed} toggleSidebar={toggleSidebar} />
 
         <div className="flex flex-1 overflow-hidden">
           <div className="grid flex-1 grid-cols-1 md:grid-cols-2 max-h-full">
-            <div className="border-r border-border overflow-auto min-h-[300px] md:min-h-0">
+            <div className={`border-r border-border overflow-auto min-h-[300px] md:min-h-0 ${styles.panel}`}>
               <InputPanel
                 onGenerate={handleGenerate}
                 isGenerating={isGenerating}
               />
             </div>
-            <div className="overflow-auto min-h-[300px] md:min-h-0">
+            <div className={`overflow-auto min-h-[300px] md:min-h-0 ${styles.panel}`}>
               <OutputPanel
                 output={output}
                 isGenerating={isGenerating}
                 generationTime={metrics.executionTime}
+                generationStartTime={generationStartTime}
               />
             </div>
           </div>

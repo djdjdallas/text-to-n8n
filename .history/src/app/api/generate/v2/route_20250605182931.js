@@ -6,8 +6,6 @@ import { RAGSystem } from "@/lib/rag/ragSystem";
 import { workflowValidator } from "@/lib/validation/workflowValidator";
 import { workflowFixer } from "@/lib/workflow/formatFixer";
 import { validateRequest } from "@/lib/validators/requestValidator";
-import { N8nValidationLoop } from "@/lib/validation/n8nValidationLoop";
-import { analytics } from "@/lib/monitoring/analytics";
 
 /**
  * Clean workflow object by removing non-standard fields
@@ -155,9 +153,6 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
   return cleaned;
 }
 
-// Create n8n validator instance
-const n8nValidator = new N8nValidationLoop();
-
 export async function POST(req) {
   try {
     const body = await req.json();
@@ -180,29 +175,13 @@ export async function POST(req) {
       provider = "claude",
       useRAG = true,
       validateOutput = true,
-      // New n8n validation options
-      validateWithN8n = process.env.N8N_API_KEY || process.env.N8N_WEBHOOK_URL
-        ? true
-        : false,
-      maxValidationAttempts = 3,
     } = body;
-
-    // Track timing
-    const startTime = Date.now();
-    const timing = {
-      ragSearch: 0,
-      generation: 0,
-      formatFixing: 0,
-      n8nValidation: 0,
-      total: 0,
-    };
 
     // 1. Initialize RAG if needed
     let relevantDocs = [];
     let ragMetadata = {};
 
     if (useRAG) {
-      const ragStart = Date.now();
       const ragSystem = new RAGSystem();
       await ragSystem.initialize();
 
@@ -219,7 +198,6 @@ export async function POST(req) {
           initialized: true,
         };
       }
-      timing.ragSearch = Date.now() - ragStart;
     }
 
     // 2. Generate optimized prompt
@@ -231,7 +209,7 @@ export async function POST(req) {
     );
 
     // 3. Generate with Claude
-    const genStart = Date.now();
+    const startTime = Date.now();
     const claudeResponse = await anthropicClient.generateWorkflow(
       optimizedPrompt,
       {
@@ -242,7 +220,6 @@ export async function POST(req) {
         maxTokens: 4000,
       }
     );
-    timing.generation = Date.now() - genStart;
 
     // 4. Parse JSON
     let workflow = claudeOptimizer.extractAndValidateJSON(
@@ -280,7 +257,6 @@ export async function POST(req) {
     }
 
     // 5. Fix platform-specific format issues
-    const fixStart = Date.now();
     if (platform === "n8n") {
       console.log("🔧 Applying n8n format fixes...");
       workflow = workflowFixer.fixN8nWorkflow(workflow);
@@ -320,60 +296,8 @@ export async function POST(req) {
         Object.keys(workflow).join(", ")
       );
     }
-    timing.formatFixing = Date.now() - fixStart;
 
-    // 6. NEW: Validate with n8n instance if enabled
-    let n8nValidationResult = null;
-    if (
-      validateWithN8n &&
-      platform === "n8n" &&
-      (process.env.N8N_API_KEY || process.env.N8N_WEBHOOK_URL)
-    ) {
-      const valStart = Date.now();
-      console.log("🔍 Starting n8n validation and auto-fix loop...");
-
-      try {
-        n8nValidationResult = await n8nValidator.validateAndFix(
-          workflow,
-          input,
-          {
-            platform,
-            maxAttempts: maxValidationAttempts,
-          }
-        );
-
-        if (n8nValidationResult.success) {
-          // Use the validated and fixed workflow
-          workflow = n8nValidationResult.workflow;
-          console.log(
-            `✅ Workflow validated and fixed after ${n8nValidationResult.attempts} attempts`
-          );
-        } else {
-          console.log(
-            `⚠️ Validation failed after ${n8nValidationResult.attempts} attempts`
-          );
-          console.log(`Last error: ${n8nValidationResult.lastError}`);
-        }
-      } catch (validationError) {
-        console.error("❌ n8n validation error:", validationError);
-        n8nValidationResult = {
-          success: false,
-          error: validationError.message,
-          attempts: 0,
-        };
-      } finally {
-        // Always cleanup test workflows
-        await n8nValidator.cleanup();
-      }
-
-      timing.n8nValidation = Date.now() - valStart;
-    } else if (validateWithN8n && platform === "n8n") {
-      console.log(
-        "⚠️ n8n validation requested but not configured. Set N8N_API_KEY or N8N_WEBHOOK_URL"
-      );
-    }
-
-    // 6.5. Debug: Check if expressions were fixed before cleaning
+    // 6. Debug: Check if expressions were fixed before cleaning
     if (platform === "n8n") {
       console.log("🔍 Sample expression check BEFORE cleaning:");
       const ifNode = workflow.nodes?.find(
@@ -387,7 +311,7 @@ export async function POST(req) {
       }
     }
 
-    // 7. IMPORTANT: Clean the workflow to remove any metadata or non-standard fields
+    // 6. IMPORTANT: Clean the workflow to remove any metadata or non-standard fields
     const cleanedWorkflow = cleanWorkflowForExport(workflow, platform);
 
     // Verify the cleaned workflow still has the fixes
@@ -440,7 +364,7 @@ export async function POST(req) {
       );
     }
 
-    // 8. Validate if requested (use cleaned workflow)
+    // 7. Validate if requested (use cleaned workflow)
     let validationResult = null;
     if (validateOutput) {
       validationResult = await workflowValidator.validateWorkflow(
@@ -450,14 +374,14 @@ export async function POST(req) {
       );
     }
 
-    // 9. Extract any metadata that was in the original workflow for our response
+    // 8. Extract any metadata that was in the original workflow for our response
     const extractedMetadata = {};
     if (workflow._metadata) {
       extractedMetadata.aiMetadata = workflow._metadata;
     }
 
-    // 10. Calculate metadata and timing
-    timing.total = Date.now() - startTime;
+    // 9. Calculate metadata
+    const generationTime = Date.now() - startTime;
     const inputTokens = anthropicClient.estimateTokens(optimizedPrompt);
     const outputTokens = anthropicClient.estimateTokens(claudeResponse.content);
     const cost = anthropicClient.calculateCost(
@@ -466,18 +390,17 @@ export async function POST(req) {
       claudeResponse.model
     );
 
-    // 11. Create response with metadata separate from workflow
+    // 10. Create response with metadata separate from workflow
     const metadataObject = {
       provider,
       model: claudeResponse.model || extractedMetadata.aiMetadata?.model,
-      generationTime: timing.generation,
+      generationTime,
       inputTokens,
       outputTokens,
       cost: cost.totalCost,
       platform,
       complexity,
       ragEnhanced: useRAG,
-      timing,
       ...ragMetadata,
     };
 
@@ -486,7 +409,7 @@ export async function POST(req) {
       metadataObject.aiMetadata = extractedMetadata.aiMetadata;
     }
 
-    // 12. Add helpful copy instructions
+    // 11. Add helpful copy instructions
     const instructions = [];
     if (platform === "n8n") {
       instructions.push(
@@ -499,42 +422,15 @@ export async function POST(req) {
       );
     }
 
-    // Add n8n validation results to response
-    const validationInfo = {
-      ...validationResult,
-      n8nValidation: n8nValidationResult
-        ? {
-            tested: true,
-            success: n8nValidationResult.success,
-            attempts: n8nValidationResult.attempts,
-            history: n8nValidationResult.history,
-            lastError: n8nValidationResult.lastError,
-            suggestions: n8nValidationResult.suggestions,
-          }
-        : {
-            tested: false,
-            reason: validateWithN8n ? "Not configured" : "Not requested",
-          },
-    };
-
     // Separate response structure for API metadata vs. the actual workflow
     const response = {
       success: true,
       instructions,
       metadata: metadataObject,
-      validation: validationInfo,
+      validation: validationResult,
       // For client rendering/information purposes
       workflow: cleanedWorkflow,
     };
-
-    // Add warnings if n8n validation failed
-    if (n8nValidationResult && !n8nValidationResult.success) {
-      response.warnings = [
-        `⚠️ Workflow failed n8n validation: ${n8nValidationResult.lastError}`,
-        `Attempted ${n8nValidationResult.attempts} times to fix automatically`,
-        ...(n8nValidationResult.suggestions || []),
-      ];
-    }
 
     // EMERGENCY FIX: Create a separate endpoint for copy functionality
     if (platform === "n8n") {
@@ -633,55 +529,9 @@ export async function POST(req) {
       );
     }
 
-    // Track analytics
-    try {
-      await analytics.trackGeneration({
-        userId: req.headers.get('x-user-id') || 'anonymous',
-        platform,
-        input,
-        success: true,
-        generationTime: timing.total,
-        tokensUsed: inputTokens + outputTokens,
-        complexity: complexity === 'simple' ? 30 : complexity === 'moderate' ? 60 : 90,
-        workflowId: cleanedWorkflow.id || Date.now().toString(),
-        n8nValidation: n8nValidationResult ? {
-          tested: true,
-          success: n8nValidationResult.success,
-          attempts: n8nValidationResult.attempts,
-          validationTime: timing.n8nValidation
-        } : null
-      });
-
-      // Track n8n validation separately if it was performed
-      if (n8nValidationResult && n8nValidationResult.validated) {
-        const lastError = n8nValidationResult.history?.find(h => !h.success);
-        await analytics.trackN8nValidation({
-          workflowId: cleanedWorkflow.id || Date.now().toString(),
-          success: n8nValidationResult.success,
-          attempts: n8nValidationResult.attempts,
-          validationTime: timing.n8nValidation,
-          errorType: lastError?.errorType || null,
-          fixApplied: lastError?.errorType || null,
-          fromCache: n8nValidationResult.fromCache || false,
-          cacheHitRate: n8nValidationResult.cacheStats?.hitRate || null
-        });
-      }
-    } catch (analyticsError) {
-      console.error('Analytics tracking error:', analyticsError);
-      // Don't fail the request due to analytics errors
-    }
-
     return NextResponse.json(response);
   } catch (error) {
     console.error("Generation error:", error);
-
-    // Cleanup any test workflows if there was an error
-    try {
-      await n8nValidator.cleanup();
-    } catch (cleanupError) {
-      console.error("Cleanup error:", cleanupError);
-    }
-
     return NextResponse.json(
       {
         success: false,
@@ -696,10 +546,6 @@ export async function POST(req) {
 
 // Health check
 export async function GET() {
-  const hasN8nValidation = !!(
-    process.env.N8N_API_KEY || process.env.N8N_WEBHOOK_URL
-  );
-
   return NextResponse.json({
     status: "healthy",
     version: "2.0",
@@ -709,7 +555,6 @@ export async function GET() {
       test: {
         rag: "/api/test/rag",
         n8nFormat: "/api/test/n8n-format",
-        n8nValidation: "/api/test/n8n-validation",
       },
     },
     features: {
@@ -717,18 +562,8 @@ export async function GET() {
       validation: true,
       formatFixer: true,
       workflowCleaner: true,
-      n8nValidation: hasN8nValidation,
       providers: ["claude", "openai"],
       platforms: ["n8n", "zapier", "make"],
-    },
-    n8nConnection: {
-      configured: hasN8nValidation,
-      method: process.env.N8N_API_KEY
-        ? "api"
-        : process.env.N8N_WEBHOOK_URL
-        ? "webhook"
-        : "none",
-      url: process.env.N8N_API_URL ? "configured" : "not configured",
     },
   });
 }

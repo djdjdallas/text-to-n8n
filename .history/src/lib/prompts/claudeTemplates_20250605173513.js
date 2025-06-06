@@ -1266,7 +1266,7 @@ NO OTHER FIELDS ARE ALLOWED!`;
    */
   getOptimalModel(complexity) {
     // Always use Claude 3.7 Sonnet for best JSON generation
-    return "claude-opus-4-20250514";
+    return "claude-3-7-sonnet-20250219";
   }
 }
 

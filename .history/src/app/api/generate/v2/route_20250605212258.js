@@ -6,8 +6,7 @@ import { RAGSystem } from "@/lib/rag/ragSystem";
 import { workflowValidator } from "@/lib/validation/workflowValidator";
 import { workflowFixer } from "@/lib/workflow/formatFixer";
 import { validateRequest } from "@/lib/validators/requestValidator";
-import { N8nValidationLoop } from "@/lib/validation/n8nValidationLoop";
-import { analytics } from "@/lib/monitoring/analytics";
+import { n8nValidator } from "@/lib/validation/n8nValidationLoop";
 
 /**
  * Clean workflow object by removing non-standard fields
@@ -154,9 +153,6 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
   deepClean(cleaned);
   return cleaned;
 }
-
-// Create n8n validator instance
-const n8nValidator = new N8nValidationLoop();
 
 export async function POST(req) {
   try {
@@ -631,44 +627,6 @@ export async function POST(req) {
         "🔄 FINAL WORKFLOW (first 200 chars):",
         JSON.stringify(importReadyWorkflow, null, 2).substring(0, 200) + "..."
       );
-    }
-
-    // Track analytics
-    try {
-      await analytics.trackGeneration({
-        userId: req.headers.get('x-user-id') || 'anonymous',
-        platform,
-        input,
-        success: true,
-        generationTime: timing.total,
-        tokensUsed: inputTokens + outputTokens,
-        complexity: complexity === 'simple' ? 30 : complexity === 'moderate' ? 60 : 90,
-        workflowId: cleanedWorkflow.id || Date.now().toString(),
-        n8nValidation: n8nValidationResult ? {
-          tested: true,
-          success: n8nValidationResult.success,
-          attempts: n8nValidationResult.attempts,
-          validationTime: timing.n8nValidation
-        } : null
-      });
-
-      // Track n8n validation separately if it was performed
-      if (n8nValidationResult && n8nValidationResult.validated) {
-        const lastError = n8nValidationResult.history?.find(h => !h.success);
-        await analytics.trackN8nValidation({
-          workflowId: cleanedWorkflow.id || Date.now().toString(),
-          success: n8nValidationResult.success,
-          attempts: n8nValidationResult.attempts,
-          validationTime: timing.n8nValidation,
-          errorType: lastError?.errorType || null,
-          fixApplied: lastError?.errorType || null,
-          fromCache: n8nValidationResult.fromCache || false,
-          cacheHitRate: n8nValidationResult.cacheStats?.hitRate || null
-        });
-      }
-    } catch (analyticsError) {
-      console.error('Analytics tracking error:', analyticsError);
-      // Don't fail the request due to analytics errors
     }
 
     return NextResponse.json(response);

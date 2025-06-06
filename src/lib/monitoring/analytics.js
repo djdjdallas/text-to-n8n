@@ -20,6 +20,7 @@ class WorkflowAnalytics {
       complexity,
       errorDetails = null,
       workflowId = null,
+      n8nValidation = null,
     } = params;
 
     await this.supabase.from("workflow_generations").insert({
@@ -32,6 +33,35 @@ class WorkflowAnalytics {
       complexity_score: complexity,
       error_details: errorDetails,
       workflow_id: workflowId,
+      n8n_validated: n8nValidation?.tested || false,
+      n8n_validation_success: n8nValidation?.success || false,
+      n8n_validation_attempts: n8nValidation?.attempts || 0,
+      n8n_validation_time_ms: n8nValidation?.validationTime || 0,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  async trackN8nValidation(params) {
+    const {
+      workflowId,
+      success,
+      attempts,
+      validationTime,
+      errorType = null,
+      fixApplied = null,
+      fromCache = false,
+      cacheHitRate = null,
+    } = params;
+
+    await this.supabase.from("n8n_validations").insert({
+      workflow_id: workflowId,
+      success,
+      attempts,
+      validation_time_ms: validationTime,
+      error_type: errorType,
+      fix_applied: fixApplied,
+      from_cache: fromCache,
+      cache_hit_rate: cacheHitRate,
       created_at: new Date().toISOString(),
     });
   }
@@ -70,6 +100,15 @@ class WorkflowAnalytics {
       .select("*")
       .gte("created_at", startDate.toISOString());
 
+    const { data: n8nValidations } = await this.supabase
+      .from("n8n_validations")
+      .select("*")
+      .gte("created_at", startDate.toISOString());
+
+    // Calculate n8n validation metrics
+    const n8nValidated = generations.filter(g => g.n8n_validated).length;
+    const n8nValidationSuccess = generations.filter(g => g.n8n_validation_success).length;
+
     return {
       generations: {
         total: generations.length,
@@ -79,6 +118,17 @@ class WorkflowAnalytics {
         avgGenerationTime: this.calculateAvg(generations, "generation_time_ms"),
         avgTokensUsed: this.calculateAvg(generations, "tokens_used"),
         complexityDistribution: this.getComplexityDistribution(generations),
+      },
+      n8nValidation: {
+        total: n8nValidated,
+        successful: n8nValidationSuccess,
+        successRate: n8nValidated > 0 ? (n8nValidationSuccess / n8nValidated * 100).toFixed(1) : 0,
+        avgAttempts: this.calculateAvg(generations.filter(g => g.n8n_validated), "n8n_validation_attempts"),
+        avgValidationTime: this.calculateAvg(generations.filter(g => g.n8n_validated), "n8n_validation_time_ms"),
+        cacheHitRate: n8nValidations.length > 0 ? 
+          (n8nValidations.filter(v => v.from_cache).length / n8nValidations.length * 100).toFixed(1) : 0,
+        errorTypes: this.groupN8nErrors(n8nValidations),
+        fixesApplied: this.groupN8nFixes(n8nValidations),
       },
       rag: {
         totalQueries: ragUsage.length,
@@ -91,6 +141,24 @@ class WorkflowAnalytics {
       },
       errorAnalysis: this.analyzeErrors(generations.filter((g) => !g.success)),
     };
+  }
+
+  groupN8nErrors(validations) {
+    return validations
+      .filter(v => !v.success && v.error_type)
+      .reduce((acc, v) => {
+        acc[v.error_type] = (acc[v.error_type] || 0) + 1;
+        return acc;
+      }, {});
+  }
+
+  groupN8nFixes(validations) {
+    return validations
+      .filter(v => v.fix_applied)
+      .reduce((acc, v) => {
+        acc[v.fix_applied] = (acc[v.fix_applied] || 0) + 1;
+        return acc;
+      }, {});
   }
 
   async getUserMetrics(userId) {
