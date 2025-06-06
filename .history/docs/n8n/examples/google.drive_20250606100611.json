@@ -1,0 +1,59 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "root",
+            "cachedResultName": "/ (Root folder)"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          220,
+          0
+        ],
+        "id": "1b52aecb-6e39-43d2-9409-459125ae71be",
+        "name": "Google Drive"
+      },
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "fb708c2c-3f74-4a5f-a38c-70212cb8cca0",
+        "name": "When clicking ‘Test workflow’"
+      }
+    ],
+    "connections": {
+      "When clicking ‘Test workflow’": {
+        "main": [
+          [
+            {
+              "node": "Google Drive",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "62375cb333bb7eb451d769c5f8df76a42e5395ca4aa036a37eae78b491141162"
+    }
+  }
+  
+  

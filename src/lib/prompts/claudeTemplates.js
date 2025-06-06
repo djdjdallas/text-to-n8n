@@ -351,10 +351,18 @@ CRITICAL FORMAT REQUIREMENTS:
      * Subject: {{$json["headers"]["subject"]}}
      * Email body text: {{$json["textPlain"]}}
      * Email body HTML: {{$json["textHtml"]}}
+     * Attachments array: {{$json["attachments"]}}
+     * Attachment count: {{$json["attachments"].length}}
    - WRONG field references:
      * {{$json.from}} or {{$json["from"]}} (will be undefined)
      * {{$json.subject}} or {{$json["subject"]}} (will be undefined)
      * {{$json.text}} or {{$json["text"]}} (will be undefined)
+     * {{$json.option}} or {{$json["option"]}} (property doesn't exist)
+   
+   CRITICAL - GMAIL ATTACHMENT REFERENCES:
+   - BEFORE splitInBatches: {{$json["attachments"][0]["id"]}}
+   - AFTER splitInBatches: {{$json["id"]}} (attachment becomes root object)
+   - Gmail getAttachment node MUST have resource: "messageAttachment"
   
   2. SLACK NODE:
      - Must have typeVersion: 2.2
@@ -413,7 +421,55 @@ CRITICAL FORMAT REQUIREMENTS:
        "rightValue": "",
        "operation": "exists"
   
-  4. GOOGLE SHEETS NODE:
+  4. GOOGLE DRIVE NODE:
+     - CRITICAL: Always include "resource" parameter:
+       * For file operations (upload, download): resource: "file"
+       * For folder operations (create, list): resource: "folder"
+     - CRITICAL: Use __rl resource locator structure for driveId and folderId
+     - CORRECT format for file upload:
+       "parameters": {
+         "resource": "file",  // REQUIRED
+         "operation": "upload",
+         "driveId": {
+           "__rl": true,
+           "mode": "list",
+           "value": "My Drive"
+         },
+         "folderId": {
+           "__rl": true,
+           "mode": "list", 
+           "value": "root",
+           "cachedResultName": "/ (Root folder)"
+         },
+         "name": "={{$binary.data.fileName}}",  // For dynamic filename from binary
+         "binaryPropertyName": "data",
+         "options": {}
+       }
+     - CORRECT format for folder creation:
+       "parameters": {
+         "resource": "folder",  // REQUIRED
+         "operation": "create",
+         "driveId": {
+           "__rl": true,
+           "mode": "list",
+           "value": "My Drive"
+         },
+         "folderId": {
+           "__rl": true,
+           "mode": "list",
+           "value": "root",
+           "cachedResultName": "/ (Root folder)"
+         },
+         "name": "{{$json[\\"folderName\\"]}}",
+         "options": {}
+       }
+     - NEVER use "parents" field - use "folderId" instead
+     - Always include the __rl resource locator structure
+     - Always include empty "options": {} field
+     - For root folder: value="root", cachedResultName="/ (Root folder)"
+     - For specific folders: value="folder-id-here", mode can be "id" instead of "list"
+  
+  5. GOOGLE SHEETS NODE:
      - Do NOT use __rl wrapper objects
      - documentId and sheetName should be simple strings
      - For "getAll" operation:
@@ -430,7 +486,7 @@ CRITICAL FORMAT REQUIREMENTS:
          "returnAllMatches": true
        }
   
-  5. SET NODE:
+  6. SET NODE:
      - values.string must be an array of objects with name and value
      - NEVER include an "options" field in Set node parameters
      - NEVER include "keepOnlySet" or any other options
@@ -445,7 +501,7 @@ CRITICAL FORMAT REQUIREMENTS:
          }
        }
   
-  6. SWITCH NODE:
+  7. SWITCH NODE:
      - Preferred over IF for binary conditions
      - Must have dataType, value1, rules.rules array
      - CORRECT structure:
@@ -461,7 +517,7 @@ CRITICAL FORMAT REQUIREMENTS:
          "fallbackOutput": 1
        }
   
-  7. WEBHOOK NODE:
+  8. WEBHOOK NODE:
      - Valid options: responseHeaders, rawBody only
      - Do NOT include responseData in options
      - Do NOT include webhookId field at node level
@@ -475,7 +531,7 @@ CRITICAL FORMAT REQUIREMENTS:
          }
        }
   
-  8. RESPONDTOWEBHOOK NODE:
+  9. RESPONDTOWEBHOOK NODE:
      - responseCode must be a number at parameters level, not in options
      - Do NOT use expressions for responseCode
      - NEVER use complex expressions like: "responseData": "={{JSON.stringify({success: true})}}" 
@@ -494,26 +550,26 @@ CRITICAL FORMAT REQUIREMENTS:
          "responseData": "Success"
        }
   
-  9. ALL NODES:
+  10. ALL NODES:
      - Must have unique id (lowercase alphanumeric, 6+ chars)
      - Must have position array: [x, y]
      - Must include credentials object for nodes that need auth
      - Node names must match exactly in connections
      - Each node must have: id (string), name (string), type (string), typeVersion (number), position ([x,y])
   
-  10. CONNECTIONS:
+  11. CONNECTIONS:
      - CORRECT format: { "NodeName": { "main": [[{ "node": "TargetNode", "type": "main", "index": 0 }]] }}
      - main must be array of arrays
      - Each connection must have: node, type, index
   
-  11. WORKFLOW STRUCTURE:
+  12. WORKFLOW STRUCTURE:
    - Must include ONLY these fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
    - Do NOT include any fields like _metadata, instructions, or validation
    - settings must have executionOrder: "v1"
    - meta must have instanceId
    - Include versionId, pinData: {}, staticData: null, tags: []
   
-  12. NODE SELECTION RULES:
+  13. NODE SELECTION RULES:
      - For simple email validation: Webhook → Switch → Set nodes
      - AVOID: emailSend for non-email-sending tasks
      - AVOID: function nodes for simple data creation
@@ -709,16 +765,68 @@ CRITICAL FORMAT REQUIREMENTS:
          }
        }
      HANDLING EMAIL ATTACHMENTS IN N8N:
-1. Gmail Trigger provides attachment metadata only
-2. To download attachment content, use Gmail node with "getAttachment"
-3. Workflow pattern:
-   - Gmail Trigger (gets email with attachment info)
-   - IF node (check if has attachments)
-   - Code/Function node (extract attachment IDs)
-   - Gmail node (download each attachment)
-   - Google Drive node (upload binary data)
+
+GMAIL ATTACHMENT DATA STRUCTURE:
+1. Gmail Trigger provides attachment metadata at $json["attachments"] array
+2. Each attachment object in the array has these properties:
+   - id: string (attachment ID for downloading)
+   - filename: string (original filename)
+   - mimeType: string (file MIME type)
+   - size: number (file size in bytes)
+   - Example: {"id": "abc123", "filename": "document.pdf", "mimeType": "application/pdf", "size": 123456}
+
+3. CRITICAL EXPRESSION RULES:
+   - BEFORE splitInBatches: Access via array index {{$json["attachments"][0]["id"]}}
+   - AFTER splitInBatches: Access directly {{$json["id"]}} or {{$json.id}}
+   - NEVER use non-existent properties like {{$json.option}} or {{$json["option"]}}
+
+CORRECT WORKFLOW PATTERN FOR ATTACHMENTS:
+1. Gmail Trigger (includeAttachments: true)
+   - Output: Email with attachments array
+   - Each email has: $json["attachments"] = [{id, filename, mimeType, size}, ...]
    
-Binary data reference: {{$binary.data}} 
+2. IF node (check if attachments exist)
+   - Condition: {{$json["attachments"].length}} > 0 (operation: largerThan)
+   - NOT: {{$json["attachments"].length > 0}} === true (this causes import errors)
+   
+3. splitInBatches node
+   - Splits the attachments array into individual items
+   - CHANGES DATA STRUCTURE: Each item becomes the root $json
+   
+4. Gmail getAttachment node (CRITICAL: include resource parameter)
+   - Parameters: 
+     * resource: "messageAttachment" (REQUIRED)
+     * operation: "getAttachment"
+     * messageId: {{$json["messageId"]}} (from original email)
+     * attachmentId: {{$json["id"]}} (from current attachment item)
+   
+5. Google Drive upload node (CRITICAL: include resource parameter)
+   - Parameters:
+     * resource: "file" (REQUIRED)
+     * operation: "upload"
+     * name: {{$json["filename"]}} (attachment filename)
+     * parents: ["root"] (simple array format)
+     * binaryPropertyName: "data"
+
+CRITICAL PROPERTY REFERENCE RULES:
+- BEFORE splitInBatches (working with full email):
+  * Attachment count: {{$json["attachments"].length}}
+  * First attachment ID: {{$json["attachments"][0]["id"]}}
+  * First attachment filename: {{$json["attachments"][0]["filename"]}}
+  
+- AFTER splitInBatches (working with single attachment):
+  * Attachment ID: {{$json["id"]}} or {{$json.id}}
+  * Attachment filename: {{$json["filename"]}} or {{$json.filename}}
+  * Attachment MIME type: {{$json["mimeType"]}} or {{$json.mimeType}}
+  * DO NOT use: {{$json["attachments"][0]["id"]}} (this will be undefined)
+
+COMMON ERRORS TO AVOID:
+- Using {{$json.option}} or {{$json["option"]}} (property doesn't exist)
+- Using {{$json["attachments"][0]["id"]}} after splitInBatches
+- Missing resource parameters in Gmail and Google Drive nodes
+- Using complex expressions in IF node conditions
+
+Binary data reference after getAttachment: {{$binary.data}} 
 
 SCHEDULE TRIGGER WEEKLY SETUP:
 - To schedule weekly on a specific day/time, use cron expression:
@@ -736,29 +844,69 @@ WEBHOOK + RESPOND PATTERN:
   - respondToWebhook (respondWith="json", responseCode=200, options={responseData:"firstEntryJson"})
 
 GOOGLE DRIVE NODE:
-  - For folder search use:
-    "parameters": {
-      "operation": "search",
-      "resource": "folder", 
-      "searchMethod": "name",
-      "searchText": "Folder Name"
-    }
+  - CRITICAL: Always include "resource" parameter:
+    * For file operations (upload, download): resource: "file"
+    * For folder operations (create, list): resource: "folder"
   
   - For file upload use:
     "parameters": {
+      "resource": "file",  // REQUIRED
       "operation": "upload",
-      "resource": "file",
-      "name": "={{$json[\\"filename\\"]}}",
-      "parents": {
+      "driveId": {
         "__rl": true,
-        "value": "={{$node[\\"Get Folder\\"].json[\\"id\\"]}}",
-        "mode": "id"
+        "mode": "list",
+        "value": "My Drive"
       },
-      "binaryPropertyName": "data"
+      "folderId": {
+        "__rl": true,
+        "mode": "list", 
+        "value": "root",
+        "cachedResultName": "/ (Root folder)"
+      },
+      "name": "={{$binary.data.fileName}}",  // For dynamic filename from binary
+      "binaryPropertyName": "data",
+      "options": {}
     }
   
-  - Binary data is referenced by property name, not path
-  - Use parents instead of folderId for upload`,
+  - For file download use:
+    "parameters": {
+      "resource": "file",  // REQUIRED
+      "operation": "download",
+      "driveId": {
+        "__rl": true,
+        "mode": "list",
+        "value": "My Drive"
+      },
+      "fileId": "{{$json[\\"id\\"]}}",
+      "binaryPropertyName": "data",
+      "options": {}
+    }
+  
+  - For folder creation use:
+    "parameters": {
+      "resource": "folder",  // REQUIRED
+      "operation": "create",
+      "driveId": {
+        "__rl": true,
+        "mode": "list",
+        "value": "My Drive"
+      },
+      "folderId": {
+        "__rl": true,
+        "mode": "list",
+        "value": "root",
+        "cachedResultName": "/ (Root folder)"
+      },
+      "name": "{{$json[\\"folderName\\"]}}",
+      "options": {}
+    }
+  
+  - NEVER use "parents" field - use "folderId" instead
+  - Always include the __rl resource locator structure
+  - Always include empty "options": {} field
+  - For root folder: value="root", cachedResultName="/ (Root folder)"
+  - For specific folders: value="folder-id-here", mode can be "id" instead of "list"
+  - Binary data is referenced by property name, not path`,
 
       [PLATFORMS.ZAPIER]: `### Zapier Technical Specifications:
   - Trigger must be first, followed by actions array
@@ -823,7 +971,7 @@ GOOGLE DRIVE NODE:
        * RIGHT: "Text with {{$json.field}}" (template only)
        * RIGHT: "='Text with ' + $json.field" (expression only)
 
-  12. NODE SELECTION RULES:
+  13. NODE SELECTION RULES:
      - For simple email validation: Webhook → Switch → Set nodes
      - AVOID: emailSend for non-email-sending tasks
      - AVOID: function nodes for simple data creation
@@ -915,6 +1063,7 @@ COMMON GOTCHAS TO AVOID:
 - RespondToWebhook: responseCode must be a number at parameters level, not in options
 - Webhook: only valid options are responseHeaders and rawBody
 - Google Sheets: NEVER include "options" field or "valueInputMode" for ANY operation
+- Google Drive: parents MUST be an object with __rl flag: {__rl: true, value: "root", mode: "id"} - NOT an array like ["root"]
 - HTTP Request: NO options field at all - put parameters like timeout and followRedirects at root level
 - OpenAI node: Parameters like model, temperature, maxTokens should be at root level, NOT in an options object
 

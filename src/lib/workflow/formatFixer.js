@@ -1,4 +1,6 @@
 // src/lib/workflow/formatFixer.js
+import { GoogleDriveExamples } from '@/lib/examples/googleDriveExamples';
+
 export class WorkflowFormatFixer {
   /**
    * Remove NoOp nodes entirely
@@ -64,10 +66,33 @@ export class WorkflowFormatFixer {
   }
   
   /**
-   * Aggressively remove ALL options fields from ALL nodes
+   * Aggressively remove ALL options fields from ALL nodes EXCEPT those that require it
    */
   removeAllOptionsFields(workflow) {
+    // Define nodes that MUST keep their options field
+    const nodesRequiringOptions = [
+      'n8n-nodes-base.googleDrive',
+      // Add any other nodes that require options here
+    ];
+    
     workflow.nodes?.forEach(node => {
+      // Skip nodes that require options field
+      if (nodesRequiringOptions.includes(node.type)) {
+        console.log(`  ℹ️ Preserving required options field for ${node.type} node "${node.name}"`);
+        // Ensure the options field exists for these nodes
+        if (!node.parameters) node.parameters = {};
+        if (!node.parameters.options) {
+          node.parameters.options = {};
+          console.log(`  ✅ Added required empty options field to ${node.type} node "${node.name}"`);
+        }
+        
+        // Still remove otherOptions if it exists (not standard)
+        if (node.parameters.otherOptions) {
+          delete node.parameters.otherOptions;
+        }
+        return;
+      }
+      
       if (node.parameters?.options) {
         delete node.parameters.options;
       }
@@ -393,6 +418,11 @@ export class WorkflowFormatFixer {
           this.fixGmailTrigger(node);
         }
 
+        // Fix Gmail node parameters
+        if (node.type === "n8n-nodes-base.gmail") {
+          this.fixGmailNode(node);
+        }
+
         // Fix Slack node
         if (node.type === "n8n-nodes-base.slack") {
           this.fixSlackNode(node);
@@ -528,6 +558,23 @@ export class WorkflowFormatFixer {
     // Add debug method for detailed structure inspection
     this.debugWorkflowStructure(fixed);
 
+    // 12. Fix attachment field references after splitInBatches
+    this.fixAttachmentReferences(fixed);
+
+    // 13. Validate and fix expression property references
+    this.validateAndFixExpressions(fixed);
+
+    // 14. FINAL STEP: Ensure required options fields for specific node types
+    // This must run LAST to ensure no cleanup operations remove required fields
+    this.ensureRequiredOptionsFields(fixed);
+
+    // Debug logging to confirm options field is present
+    fixed.nodes?.forEach(node => {
+      if (node.type === 'n8n-nodes-base.googleDrive') {
+        console.log(`🔍 FINAL CHECK: Google Drive node "${node.name}" has options: ${!!node.parameters?.options}`);
+      }
+    });
+
     // Debug logging to confirm completion
     console.log("✅ formatFixer.fixN8nWorkflow completed!");
     
@@ -610,104 +657,90 @@ export class WorkflowFormatFixer {
   fixGoogleDriveNode(node) {
     if (!node.parameters) node.parameters = {};
 
-    // Fix list/search operations
-    if (
-      node.parameters.operation === "list" &&
-      node.parameters.resource === "folder"
-    ) {
-      // Remove invalid 'name' parameter at root level
-      if (node.parameters.name) {
-        delete node.parameters.name;
-      }
+    // Load the example structure
+    const exampleParams = GoogleDriveExamples.getNodeStructure();
+    
+    console.log(`  🔧 Converting Google Drive node to match n8n example`);
 
-      // Ensure search query is in the right place
-      if (!node.parameters.queryString && node.parameters.options?.q) {
-        node.parameters.queryString = node.parameters.options.q;
-        delete node.parameters.options.q;
-      }
-
-      // For folder search, it should use 'search' operation
-      node.parameters.operation = "search";
-      node.parameters.searchMethod = "name";
-      node.parameters.searchText = "Invoices 2025";
-
-      // Remove options if empty
-      if (
-        node.parameters.options &&
-        Object.keys(node.parameters.options).length === 0
-      ) {
-        delete node.parameters.options;
-      }
-    }
-
-    // Fix upload operations
-    if (
-      node.parameters.operation === "upload" &&
-      node.parameters.resource === "file"
-    ) {
-      // Fix binary data reference
-      if (node.parameters.binary) {
-        delete node.parameters.binary;
-        // Set the correct binary property name
-        node.parameters.binaryPropertyName = "data";
-      }
-
-      // Fix parents format - common issue causing validation errors
+    // For file upload operations
+    if (node.parameters.operation === "upload" && node.parameters.resource === "file") {
+      // Remove old 'parents' field
       if (node.parameters.parents) {
-        // Log current format
-        console.log(`  Current parents format:`, JSON.stringify(node.parameters.parents));
-        
-        // Fix all possible wrong formats
-        if (typeof node.parameters.parents === 'object' && node.parameters.parents.values) {
-          // Wrong format: {"values":[{"id":"root"}]}
-          const parentIds = node.parameters.parents.values.map(v => v.id || 'root');
-          node.parameters.parents = parentIds;
-          console.log(`  ✅ Fixed to:`, JSON.stringify(node.parameters.parents));
-        } else if (typeof node.parameters.parents === 'string') {
-          // If it's a single string, convert to array
-          node.parameters.parents = [node.parameters.parents];
-          console.log(`  ✅ Converted string to array:`, JSON.stringify(node.parameters.parents));
-        } else if (!Array.isArray(node.parameters.parents)) {
-          // If it's any other format, default to ["root"]
-          node.parameters.parents = ["root"];
-          console.log(`  ✅ Set default parents: ["root"]`);
-        }
+        delete node.parameters.parents;
       }
 
-      // Also check for binaryData flag
-      if (node.parameters.binaryData === true && !node.parameters.binaryPropertyName) {
+      // Use example structure as base, or fallback to manual structure
+      if (exampleParams) {
+        // Copy the resource locator structures from example
+        node.parameters.driveId = JSON.parse(JSON.stringify(exampleParams.driveId));
+        node.parameters.folderId = JSON.parse(JSON.stringify(exampleParams.folderId));
+        node.parameters.options = exampleParams.options || {};
+      } else {
+        // Fallback structure
+        node.parameters.driveId = {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        };
+
+        node.parameters.folderId = {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        };
+
+        node.parameters.options = {};
+      }
+
+      // Ensure required upload parameters
+      if (!node.parameters.name || node.parameters.name === "={{$json.filename}}") {
+        node.parameters.name = "={{$binary.data.fileName}}";
+      }
+
+      if (!node.parameters.binaryPropertyName) {
         node.parameters.binaryPropertyName = "data";
-        console.log(`  ✅ Added missing binaryPropertyName`);
       }
+      
+      // Log the structure for debugging
+      console.log(`  ✅ Fixed Google Drive node with __rl structure`);
+    }
 
-      // Fix folder ID reference
-      if (
-        node.parameters.folderId &&
-        typeof node.parameters.folderId === "string"
-      ) {
-        // Ensure it's using proper expression
-        if (node.parameters.folderId.includes("getFolderID")) {
-          node.parameters.parents = {
-            __rl: true,
-            value: node.parameters.folderId,
-            mode: "id",
-          };
-          delete node.parameters.folderId;
-        }
+    // Fix folder operations
+    if (node.parameters.operation === "create" && node.parameters.resource === "folder") {
+      // Similar structure updates for folder creation
+      if (exampleParams) {
+        node.parameters.driveId = JSON.parse(JSON.stringify(exampleParams.driveId));
+        node.parameters.folderId = JSON.parse(JSON.stringify(exampleParams.folderId));
+        node.parameters.options = exampleParams.options || {};
+      } else {
+        // Fallback structure
+        node.parameters.driveId = {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        };
+
+        node.parameters.folderId = {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        };
+
+        node.parameters.options = {};
       }
     }
 
-    // Fix create folder operations
-    if (
-      node.parameters.operation === "create" &&
-      node.parameters.resource === "folder"
-    ) {
-      // Ensure proper structure
-      if (!node.parameters.name && node.parameters.folderName) {
-        node.parameters.name = node.parameters.folderName;
-        delete node.parameters.folderName;
-      }
+    // CRITICAL: Ensure options field ALWAYS exists for Google Drive nodes
+    // This is a MANDATORY field in n8n for Google Drive nodes
+    if (!node.parameters.options) {
+      node.parameters.options = {};
+      console.log(`✅ Added required options field to Google Drive node "${node.name}"`);
     }
+
+    // Log the final structure for debugging
+    console.log(`  ✅ Fixed Google Drive node structure:`, JSON.stringify(node.parameters, null, 2));
   }
 
   /**
@@ -748,6 +781,117 @@ export class WorkflowFormatFixer {
       delete node.parameters.scope;
     }
   }
+
+  /**
+   * Fix Google Drive parents structure for different n8n versions
+   */
+  fixGoogleDriveParents(parents, nodeName) {
+    if (!parents) {
+      return ["root"];
+    }
+
+    console.log(`  Current parents format for ${nodeName}:`, JSON.stringify(parents));
+    
+    let parentIds = [];
+    
+    // Handle all possible formats across different n8n versions
+    if (typeof parents === 'object' && !Array.isArray(parents)) {
+      // Handle __rl wrapper format (newer n8n versions)
+      if (parents.__rl && parents.value) {
+        parentIds = [parents.value];
+      }
+      // Handle values array format
+      else if (parents.values && Array.isArray(parents.values)) {
+        parentIds = parents.values.map(v => {
+          if (typeof v === 'string') return v;
+          if (v && (v.id || v.value)) return v.id || v.value;
+          return 'root';
+        });
+      }
+      // Handle mode-based format
+      else if (parents.mode && parents.value) {
+        parentIds = [parents.value];
+      }
+      // Handle simple object with id
+      else if (parents.id || parents.value) {
+        parentIds = [parents.id || parents.value];
+      }
+      // Default to root if object but can't parse
+      else {
+        parentIds = ["root"];
+      }
+    } else if (typeof parents === 'string') {
+      parentIds = [parents];
+    } else if (Array.isArray(parents)) {
+      // Already an array, validate each item
+      parentIds = parents.filter(p => p && typeof p === 'string' && p.trim() !== '');
+    } else {
+      parentIds = ["root"];
+    }
+    
+    // Ensure we always have at least ["root"]
+    if (parentIds.length === 0) {
+      parentIds = ["root"];
+    }
+    
+    // Validate that all parent IDs are valid strings
+    parentIds = parentIds.map(id => {
+      if (typeof id !== 'string' || id.trim() === '') {
+        return 'root';
+      }
+      return id.trim();
+    });
+    
+    console.log(`  ✅ Fixed parents to simple array for ${nodeName}:`, JSON.stringify(parentIds));
+    return parentIds;
+  }
+
+  /**
+   * Fix Gmail node parameters (not trigger)
+   */
+  fixGmailNode(node) {
+    if (!node.parameters) node.parameters = {};
+
+    // Fix getAttachment operation - ensure resource is set
+    if (node.parameters.operation === "getAttachment") {
+      // CRITICAL: Ensure resource is set to "messageAttachment" for getAttachment operations
+      if (!node.parameters.resource) {
+        node.parameters.resource = "messageAttachment";
+        console.log(`  ✅ Added missing resource parameter to Gmail getAttachment node: ${node.name}`);
+      }
+    }
+
+    // Fix get operation - ensure resource is set
+    if (node.parameters.operation === "get") {
+      // CRITICAL: Ensure resource is set to "messageAttachment" for get operations
+      if (!node.parameters.resource) {
+        node.parameters.resource = "messageAttachment";
+        console.log(`  ✅ Added missing resource parameter to Gmail get node: ${node.name}`);
+      }
+      
+      // Add dataPropertyAttachmentsPrefixName for binary data output
+      if (!node.parameters.dataPropertyAttachmentsPrefixName) {
+        node.parameters.dataPropertyAttachmentsPrefixName = "data";
+        console.log(`  ✅ Added dataPropertyAttachmentsPrefixName to Gmail get node: ${node.name}`);
+      }
+    }
+
+    // Fix other Gmail operations that might need resource parameters
+    if (node.parameters.operation === "send") {
+      if (!node.parameters.resource) {
+        node.parameters.resource = "message";
+        console.log(`  ✅ Added missing resource parameter to Gmail send node: ${node.name}`);
+      }
+    }
+
+    if (node.parameters.operation === "list") {
+      if (!node.parameters.resource) {
+        node.parameters.resource = "message";
+        console.log(`  ✅ Added missing resource parameter to Gmail list node: ${node.name}`);
+      }
+    }
+  }
+
   fixAttachmentWorkflow(workflow) {
     // Check if workflow deals with email attachments
     const hasGmailTrigger = workflow.nodes.some(
@@ -771,9 +915,11 @@ export class WorkflowFormatFixer {
           typeVersion: 1,
           position: [1000, 240],
           parameters: {
-            operation: "getAttachment",
-            messageId: '={{$json["messageId"]}}',
-            attachmentId: '={{$json["id"]}}',
+            resource: "messageAttachment",
+            operation: "get",
+            messageId: '={{$node["Gmail Trigger"].json["id"]}}',
+            attachmentId: '={{$json.id}}',
+            dataPropertyAttachmentsPrefixName: "data"
           },
           credentials: {
             gmailOAuth2: { id: "1", name: "Gmail account" },
@@ -1845,6 +1991,291 @@ export class WorkflowFormatFixer {
         return v.toString(16);
       }
     );
+  }
+
+  /**
+   * Fix attachment field references after splitInBatches
+   */
+  fixAttachmentReferences(workflow) {
+    if (!workflow.nodes) return;
+    
+    console.log("🔧 Fixing attachment field references...");
+    
+    // Find splitInBatches nodes that handle attachments
+    const splitNodes = workflow.nodes.filter(n => 
+      n.type === 'n8n-nodes-base.splitInBatches'
+    );
+    
+    splitNodes.forEach(splitNode => {
+      // Find nodes that come after this split node
+      const downstreamNodes = this.findDownstreamNodes(workflow, splitNode.name);
+      
+      downstreamNodes.forEach(node => {
+        // Fix expressions that try to access attachments as array after split
+        this.fixNodeAttachmentExpressions(node);
+      });
+    });
+  }
+
+  /**
+   * Find all nodes that come after a given node in the workflow
+   */
+  findDownstreamNodes(workflow, nodeName) {
+    const downstreamNodes = [];
+    const visited = new Set();
+    
+    const traverse = (currentNodeName) => {
+      if (visited.has(currentNodeName)) return;
+      visited.add(currentNodeName);
+      
+      const connections = workflow.connections[currentNodeName];
+      if (connections && connections.main) {
+        connections.main.forEach(outputConnections => {
+          if (Array.isArray(outputConnections)) {
+            outputConnections.forEach(connection => {
+              if (connection.node) {
+                const targetNode = workflow.nodes.find(n => n.name === connection.node);
+                if (targetNode) {
+                  downstreamNodes.push(targetNode);
+                  traverse(connection.node);
+                }
+              }
+            });
+          }
+        });
+      }
+    };
+    
+    traverse(nodeName);
+    return downstreamNodes;
+  }
+
+  /**
+   * Fix attachment expressions in a single node
+   */
+  fixNodeAttachmentExpressions(node) {
+    const fixExpression = (value) => {
+      if (typeof value !== 'string') return value;
+      
+      // Fix patterns like {{$json["attachments"][0]["id"]}} to {{$json["id"]}}
+      return value
+        .replace(/\{\{\$json\["attachments"\]\[0\]\["(\w+)"\]\}\}/g, '{{$json["$1"]}}')
+        .replace(/\{\{\$json\["attachments"\]\[0\]\['(\w+)'\]\}\}/g, '{{$json["$1"]}}')
+        .replace(/\{\{\$json\.attachments\[0\]\.(\w+)\}\}/g, '{{$json.$1}}');
+    };
+    
+    // Recursively fix all string values in parameters
+    const fixObject = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const key in obj) {
+        if (typeof obj[key] === 'string') {
+          const before = obj[key];
+          obj[key] = fixExpression(obj[key]);
+          if (before !== obj[key]) {
+            console.log(`  ✅ Fixed attachment reference in ${node.name}: ${before} → ${obj[key]}`);
+          }
+        } else if (typeof obj[key] === 'object') {
+          fixObject(obj[key]);
+        }
+      }
+    };
+    
+    if (node.parameters) {
+      fixObject(node.parameters);
+    }
+  }
+
+  /**
+   * Validate and fix expression property references to prevent "Could not find property option" errors
+   */
+  validateAndFixExpressions(workflow) {
+    if (!workflow.nodes) return;
+    
+    console.log("🔧 Validating and fixing expression property references...");
+    
+    workflow.nodes.forEach(node => {
+      this.validateNodeExpressions(node);
+    });
+  }
+
+  /**
+   * Validate expressions in a single node
+   */
+  validateNodeExpressions(node) {
+    if (!node.parameters) return;
+    
+    // Track the node type to provide context-specific validation
+    const nodeType = node.type;
+    const nodeName = node.name;
+    
+    // Define expected data structures based on common node outputs
+    const knownDataStructures = this.getKnownDataStructures(nodeType);
+    
+    this.validateObjectExpressions(node.parameters, nodeName, nodeType, knownDataStructures);
+  }
+
+  /**
+   * Recursively validate expressions in an object
+   */
+  validateObjectExpressions(obj, nodeName, nodeType, knownDataStructures, path = '') {
+    if (!obj || typeof obj !== 'object') return;
+
+    for (const key in obj) {
+      const currentPath = path ? `${path}.${key}` : key;
+      const value = obj[key];
+      
+      if (typeof value === 'string' && value.includes('{{')) {
+        // This is an expression, validate it
+        const fixedExpression = this.validateAndFixExpression(value, nodeName, nodeType, currentPath, knownDataStructures);
+        if (fixedExpression !== value) {
+          obj[key] = fixedExpression;
+          console.log(`  ✅ Fixed expression in ${nodeName}: ${value} → ${fixedExpression}`);
+        }
+      } else if (typeof value === 'object') {
+        this.validateObjectExpressions(value, nodeName, nodeType, knownDataStructures, currentPath);
+      }
+    }
+  }
+
+  /**
+   * Validate and fix a single expression
+   */
+  validateAndFixExpression(expression, nodeName, nodeType, path, knownDataStructures) {
+    // Common problematic patterns and their fixes
+    const fixes = [
+      // Fix references to "option" (should be specific property names)
+      {
+        pattern: /\{\{\$json\[?"?option"?\]?\}\}/g,
+        replacement: '{{$json["value"]}}',
+        reason: 'Fixed undefined "option" property reference'
+      },
+      {
+        pattern: /\{\{\$json\.option\}\}/g,
+        replacement: '{{$json.value}}',
+        reason: 'Fixed undefined "option" property reference'
+      },
+      
+      // Fix Gmail attachment references based on context
+      {
+        pattern: /\{\{\$json\[?"?filename"?\]?\}\}/g,
+        replacement: () => this.getCorrectAttachmentField('filename', path, nodeType),
+        reason: 'Fixed attachment filename reference'
+      },
+      
+      // Fix common typos in property names
+      {
+        pattern: /\{\{\$json\[?"?attachement"?\]?\}\}/g, // Note the typo
+        replacement: '{{$json["attachment"]}}',
+        reason: 'Fixed typo: attachement → attachment'
+      },
+      
+      // Fix references to properties that don't exist on Gmail data
+      {
+        pattern: /\{\{\$json\[?"?email"?\]?\}\}/g,
+        replacement: '{{$json["headers"]["from"]}}',
+        reason: 'Fixed Gmail field reference: email → headers.from'
+      },
+      
+      // Fix binary data references
+      {
+        pattern: /\{\{\$binary\[?"?attachment"?\]?\}\}/g,
+        replacement: '{{$binary.data}}',
+        reason: 'Fixed binary data reference'
+      }
+    ];
+
+    let fixedExpression = expression;
+    
+    fixes.forEach(fix => {
+      const beforeFix = fixedExpression;
+      if (typeof fix.replacement === 'function') {
+        fixedExpression = fixedExpression.replace(fix.pattern, fix.replacement);
+      } else {
+        fixedExpression = fixedExpression.replace(fix.pattern, fix.replacement);
+      }
+      
+      if (beforeFix !== fixedExpression) {
+        console.log(`    ✅ ${fix.reason}: ${beforeFix} → ${fixedExpression}`);
+      }
+    });
+
+    return fixedExpression;
+  }
+
+  /**
+   * Get the correct attachment field reference based on context
+   */
+  getCorrectAttachmentField(field, path, nodeType) {
+    // After splitInBatches, attachment fields are accessed directly
+    if (path.includes('splitInBatches') || nodeType === 'n8n-nodes-base.gmail') {
+      switch (field) {
+        case 'filename':
+          return '{{$json["filename"]}}';
+        case 'id':
+          return '{{$json["id"]}}';
+        case 'mimeType':
+          return '{{$json["mimeType"]}}';
+        default:
+          return `{{$json["${field}"]}}`;
+      }
+    }
+    
+    // Before splitInBatches, they're in the attachments array
+    return `{{$json["attachments"][0]["${field}"]}}`;
+  }
+
+  /**
+   * Get known data structures for different node types
+   */
+  getKnownDataStructures(nodeType) {
+    const structures = {
+      'n8n-nodes-base.gmailTrigger': {
+        headers: ['from', 'to', 'subject', 'date'],
+        fields: ['id', 'messageId', 'textPlain', 'textHtml', 'attachments'],
+        attachments: ['id', 'filename', 'mimeType', 'size']
+      },
+      'n8n-nodes-base.gmail': {
+        // For getAttachment operation
+        fields: ['id', 'filename', 'mimeType', 'size', 'data'],
+        binaryFields: ['data']
+      },
+      'n8n-nodes-base.googleDrive': {
+        fields: ['id', 'name', 'mimeType', 'parents', 'webViewLink'],
+        uploadFields: ['id', 'name', 'webViewLink']
+      },
+      'n8n-nodes-base.splitInBatches': {
+        // After split, individual items are accessed directly
+        itemFields: ['id', 'filename', 'mimeType', 'size']
+      }
+    };
+    
+    return structures[nodeType] || {};
+  }
+
+  /**
+   * Ensure certain node types have their required fields
+   * This MUST run as the absolute LAST step to guarantee required fields exist
+   */
+  ensureRequiredOptionsFields(workflow) {
+    console.log("🔧 Final step: Ensuring required options fields for specific node types...");
+    
+    workflow.nodes?.forEach(node => {
+      // Google Drive nodes REQUIRE an options field (even if empty)
+      if (node.type === 'n8n-nodes-base.googleDrive') {
+        if (!node.parameters) {
+          node.parameters = {};
+        }
+        if (!node.parameters.options) {
+          node.parameters.options = {};
+          console.log(`  ✅ FINAL: Added required empty options field to Google Drive node "${node.name}"`);
+        } else {
+          console.log(`  ✅ FINAL: Google Drive node "${node.name}" already has options field`);
+        }
+      }
+    });
+    
+    console.log("✅ Required options fields verification complete");
   }
 }
 

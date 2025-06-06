@@ -1,16 +1,26 @@
 // src/lib/monitoring/analytics.js
-"use client";
 import { createClient } from "@supabase/supabase-js";
 
 class WorkflowAnalytics {
   constructor() {
-    this.supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    try {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+      );
+      console.log('✅ Analytics module initialized successfully');
+    } catch (error) {
+      console.error('❌ Analytics module initialization failed:', error);
+      this.supabase = null;
+    }
   }
 
   async trackGeneration(params) {
+    if (!this.supabase) {
+      console.warn('⚠️ Analytics tracking skipped - Supabase not initialized');
+      return;
+    }
+
     const {
       userId,
       platform,
@@ -24,7 +34,8 @@ class WorkflowAnalytics {
       n8nValidation = null,
     } = params;
 
-    await this.supabase.from("workflow_generations").insert({
+    try {
+      await this.supabase.from("workflow_generations").insert({
       user_id: userId,
       platform,
       input_summary: this.summarizeInput(input),
@@ -40,9 +51,17 @@ class WorkflowAnalytics {
       n8n_validation_time_ms: n8nValidation?.validationTime || 0,
       created_at: new Date().toISOString(),
     });
+    } catch (error) {
+      console.error('❌ Analytics tracking failed:', error);
+    }
   }
 
   async trackN8nValidation(params) {
+    if (!this.supabase) {
+      console.warn('⚠️ N8n validation tracking skipped - Supabase not initialized');
+      return;
+    }
+
     const {
       workflowId,
       success,
@@ -54,7 +73,8 @@ class WorkflowAnalytics {
       cacheHitRate = null,
     } = params;
 
-    await this.supabase.from("n8n_validations").insert({
+    try {
+      await this.supabase.from("n8n_validations").insert({
       workflow_id: workflowId,
       success,
       attempts,
@@ -65,6 +85,9 @@ class WorkflowAnalytics {
       cache_hit_rate: cacheHitRate,
       created_at: new Date().toISOString(),
     });
+    } catch (error) {
+      console.error('❌ N8n validation tracking failed:', error);
+    }
   }
 
   async trackRAGUsage(params) {
@@ -82,7 +105,7 @@ class WorkflowAnalytics {
       platform,
       query_text: query,
       documents_retrieved: documentsRetrieved,
-      avg_relevance_score: this.calculateAvgScore(relevanceScores),
+      avg_relevance_score: relevanceScores.length > 0 ? relevanceScores.reduce((a, b) => a + b, 0) / relevanceScores.length : 0,
       response_time_ms: responseTime,
       created_at: new Date().toISOString(),
     });
@@ -204,6 +227,17 @@ class WorkflowAnalytics {
       keywords: this.extractKeywords(input),
       hash: this.hashInput(input),
     };
+  }
+
+  hashInput(input) {
+    // Simple hash function for input text
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
   }
 
   extractKeywords(input) {

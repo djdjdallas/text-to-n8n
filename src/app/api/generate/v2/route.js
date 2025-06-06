@@ -14,9 +14,10 @@ import { analytics } from "@/lib/monitoring/analytics";
  * Only includes standard n8n fields, removes ALL extra fields
  */
 function strictCleanForValidation(workflow) {
-  const allowedWorkflowFields = ['name', 'nodes', 'connections', 'settings', 'meta', 
-                                'versionId', 'pinData', 'staticData', 'tags', 'active',
-                                'id', 'triggerCount', 'createdAt', 'updatedAt'];
+  // Only include fields that n8n API accepts during creation
+  // Based on the error, n8n API is very strict about what it accepts
+  const allowedWorkflowFields = ['name', 'nodes', 'connections', 'settings'];
+  // All other fields (meta, versionId, pinData, staticData, tags, active, id, etc.) are read-only
   const cleaned = {};
   
   // Copy only allowed workflow-level fields
@@ -36,6 +37,14 @@ function strictCleanForValidation(workflow) {
           cleanedNode[field] = node[field];
         }
       });
+      
+      // CRITICAL: Preserve options field for Google Drive nodes
+      if (cleanedNode.type === 'n8n-nodes-base.googleDrive' && 
+          cleanedNode.parameters && 
+          !cleanedNode.parameters.options) {
+        cleanedNode.parameters.options = {};
+        console.log(`✅ STRICT CLEAN: Added required options field to Google Drive node "${cleanedNode.name}"`);
+      }
       
       // Specifically remove common problematic fields
       // Don't copy webhookId, suggestions, metadata, etc.
@@ -167,11 +176,19 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
 
       // Clean current level - ONLY removing specific metadata fields
       for (const key in obj) {
+        // CRITICAL: Preserve n8n-specific fields
+        if (key === "__rl") {
+          // This is a resource locator field required by n8n - NEVER remove it
+          continue;
+        }
+        
+        // Only remove actual metadata fields
         if (
-          key.startsWith("_") ||
+          (key.startsWith("_") && key !== "__rl") || // Preserve __rl even though it starts with _
           key === "metadata" ||
           key === "instructions" ||
-          key === "validation"
+          key === "validation" ||
+          key === "webhookId" // This one we do want to remove
         ) {
           console.log(`⚠️ Removing metadata field from nested object: ${key}`);
           delete obj[key];
@@ -204,11 +221,19 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
     if (!obj || typeof obj !== "object") return;
 
     for (const key in obj) {
+      // CRITICAL: Preserve n8n-specific fields
+      if (key === "__rl") {
+        // This is a resource locator field required by n8n - NEVER remove it
+        continue;
+      }
+      
+      // Only remove actual metadata fields
       if (
-        key.startsWith("_") ||
+        (key.startsWith("_") && key !== "__rl") || // Preserve __rl even though it starts with _
         key === "metadata" ||
         key === "instructions" ||
-        key === "validation"
+        key === "validation" ||
+        key === "webhookId" // This one we do want to remove
       ) {
         delete obj[key];
       } else if (typeof obj[key] === "object" && obj[key] !== null) {
@@ -732,10 +757,54 @@ export async function POST(req) {
             `✅ Fixed Gmail credentials for node "${node.name}" in final workflow`
           );
         }
+
+        // CRITICAL: Validate Google Drive nodes have __rl structure
+        if (node.type === "n8n-nodes-base.googleDrive") {
+          // Ensure __rl fields are present
+          if (!node.parameters?.driveId?.__rl || !node.parameters?.folderId?.__rl) {
+            console.error(`❌ Google Drive node missing __rl structure!`);
+            console.log(`Current structure:`, JSON.stringify(node.parameters, null, 2));
+            
+            // Emergency fix - add the structure back
+            if (!node.parameters.driveId || !node.parameters.driveId.__rl) {
+              node.parameters.driveId = {
+                "__rl": true,
+                "mode": "list",
+                "value": "My Drive"
+              };
+            }
+            
+            if (!node.parameters.folderId || !node.parameters.folderId.__rl) {
+              node.parameters.folderId = {
+                "__rl": true,
+                "mode": "list",
+                "value": "root",
+                "cachedResultName": "/ (Root folder)"
+              };
+            }
+
+            console.log(`✅ Emergency fixed Google Drive node "${node.name}" __rl structure`);
+          } else {
+            console.log(`✅ Google Drive node "${node.name}" has valid __rl structure`);
+          }
+        }
       });
 
       // Deep copy the fixed cleanedWorkflow
       const importReadyWorkflow = JSON.parse(JSON.stringify(cleanedWorkflow));
+
+      // CRITICAL: Final check to ensure Google Drive nodes have options field
+      importReadyWorkflow.nodes?.forEach(node => {
+        if (node.type === 'n8n-nodes-base.googleDrive') {
+          if (!node.parameters) node.parameters = {};
+          if (!node.parameters.options) {
+            node.parameters.options = {};
+            console.log(`✅ FINAL IMPORT CHECK: Added required options to Google Drive node "${node.name}"`);
+          } else {
+            console.log(`✅ FINAL IMPORT CHECK: Google Drive node "${node.name}" has options field`);
+          }
+        }
+      });
 
       // ENSURE these critical fields are ALWAYS included (even with default values)
       // This is belt-and-suspenders to make absolutely sure they're present
