@@ -10,6 +10,72 @@ import { N8nValidationLoop } from "@/lib/validation/n8nValidationLoop";
 import { analytics } from "@/lib/monitoring/analytics";
 
 /**
+ * Strict cleaning function for n8n validation
+ * Only includes standard n8n fields, removes ALL extra fields
+ */
+function strictCleanForValidation(workflow) {
+  const allowedWorkflowFields = ['name', 'nodes', 'connections', 'settings', 'meta', 
+                                'versionId', 'pinData', 'staticData', 'tags', 'active',
+                                'id', 'triggerCount', 'createdAt', 'updatedAt'];
+  const cleaned = {};
+  
+  // Copy only allowed workflow-level fields
+  allowedWorkflowFields.forEach(field => {
+    if (workflow[field] !== undefined) {
+      cleaned[field] = workflow[field];
+    }
+  });
+  
+  // Deep clean nodes - remove any non-standard fields
+  if (cleaned.nodes) {
+    const allowedNodeFields = ['id', 'name', 'type', 'typeVersion', 'position', 'parameters', 'credentials'];
+    cleaned.nodes = cleaned.nodes.map(node => {
+      const cleanedNode = {};
+      allowedNodeFields.forEach(field => {
+        if (node[field] !== undefined) {
+          cleanedNode[field] = node[field];
+        }
+      });
+      
+      // Specifically remove common problematic fields
+      // Don't copy webhookId, suggestions, metadata, etc.
+      
+      return cleanedNode;
+    });
+  }
+  
+  // Deep clean connections - ensure proper structure
+  if (cleaned.connections) {
+    const cleanedConnections = {};
+    Object.keys(cleaned.connections).forEach(sourceName => {
+      const connection = cleaned.connections[sourceName];
+      if (connection && typeof connection === 'object') {
+        cleanedConnections[sourceName] = {
+          main: connection.main || []
+        };
+      }
+    });
+    cleaned.connections = cleanedConnections;
+  }
+  
+  // Ensure settings is clean
+  if (cleaned.settings && typeof cleaned.settings === 'object') {
+    const allowedSettingsFields = ['executionOrder', 'saveDataErrorExecution', 'saveDataSuccessExecution', 
+                                  'saveExecutionProgress', 'saveManualExecutions', 'executionTimeout', 'timezone'];
+    const cleanedSettings = {};
+    allowedSettingsFields.forEach(field => {
+      if (cleaned.settings[field] !== undefined) {
+        cleanedSettings[field] = cleaned.settings[field];
+      }
+    });
+    cleaned.settings = cleanedSettings;
+  }
+  
+  console.log('🧹 Strict cleaning complete. Removed any non-standard fields.');
+  return cleaned;
+}
+
+/**
  * Clean workflow object by removing non-standard fields
  * This is VERY strict to ensure only allowed fields are included
  */
@@ -249,6 +315,51 @@ export async function POST(req) {
       claudeResponse.content
     );
 
+    // NEW: Validate that we got a proper workflow structure
+    if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
+      console.error("❌ Invalid workflow structure from AI:", workflow);
+      
+      // Check if we got node parameters at the top level (common error)
+      if (workflow.labelIds || workflow.parameters || workflow.includeAttachments) {
+        console.log("⚠️ AI returned node parameters instead of workflow. Attempting to reconstruct...");
+        
+        // Try to reconstruct a basic workflow structure
+        workflow = {
+          name: "Generated Workflow",
+          nodes: [{
+            id: workflowFixer.generateNodeId(),
+            name: "Gmail Trigger",
+            type: "n8n-nodes-base.gmailTrigger",
+            typeVersion: 1,
+            position: [250, 300],
+            parameters: {
+              labelIds: workflow.labelIds || ["INBOX"],
+              includeAttachments: workflow.includeAttachments || false
+            },
+            credentials: {
+              gmailOAuth2: {
+                id: "1",
+                name: "Gmail account"
+              }
+            }
+          }],
+          connections: {},
+          settings: {
+            executionOrder: "v1"
+          }
+        };
+      } else {
+        // Complete failure - return a minimal valid workflow
+        throw new Error("AI failed to generate a valid workflow structure");
+      }
+    }
+
+    // Also ensure workflow has required top-level fields
+    if (!workflow.name) workflow.name = "Generated Workflow";
+    if (!workflow.nodes) workflow.nodes = [];
+    if (!workflow.connections) workflow.connections = {};
+    if (!workflow.settings) workflow.settings = { executionOrder: "v1" };
+
     // Debug logging before any fixes
     if (platform === "n8n") {
       console.log("📊 BEFORE formatFixer - Initial state:");
@@ -281,10 +392,32 @@ export async function POST(req) {
 
     // 5. Fix platform-specific format issues
     const fixStart = Date.now();
+    let formatFixSuggestions = [];
     if (platform === "n8n") {
       console.log("🔧 Applying n8n format fixes...");
-      workflow = workflowFixer.fixN8nWorkflow(workflow);
+      
+      // Track Google Drive nodes before fixes
+      const driveNodesBefore = workflow.nodes?.filter(n => n.type === "n8n-nodes-base.googleDrive");
+      if (driveNodesBefore?.length > 0) {
+        console.log("🔍 Google Drive nodes BEFORE formatFixer:");
+        driveNodesBefore.forEach(node => {
+          console.log(`  - ${node.name}: parents = ${JSON.stringify(node.parameters?.parents)}`);
+        });
+      }
+      
+      const fixResult = workflowFixer.fixN8nWorkflow(workflow);
+      workflow = fixResult.workflow;
+      formatFixSuggestions = fixResult.suggestions || [];
       console.log("✅ Format fixes applied");
+      
+      // Track Google Drive nodes after fixes
+      const driveNodesAfter = workflow.nodes?.filter(n => n.type === "n8n-nodes-base.googleDrive");
+      if (driveNodesAfter?.length > 0) {
+        console.log("🔍 Google Drive nodes AFTER formatFixer:");
+        driveNodesAfter.forEach(node => {
+          console.log(`  - ${node.name}: parents = ${JSON.stringify(node.parameters?.parents)}`);
+        });
+      }
 
       // Debug logging after fixes
       console.log("📊 AFTER formatFixer - Fixed state:");
@@ -333,8 +466,38 @@ export async function POST(req) {
       console.log("🔍 Starting n8n validation and auto-fix loop...");
 
       try {
+        // Create a strictly cleaned version for n8n validation
+        const cleanedForValidation = strictCleanForValidation(workflow);
+        console.log("🧹 Created strictly cleaned workflow for n8n validation");
+        
+        // Detailed logging to identify validation issues
+        console.log('🔍 Workflow being sent to n8n validation:');
+        console.log('📋 Top-level fields:', Object.keys(cleanedForValidation));
+        console.log('📋 Node count:', cleanedForValidation.nodes?.length || 0);
+        
+        // Check for problematic fields in nodes
+        cleanedForValidation.nodes?.forEach((node, index) => {
+          const standardNodeFields = ['id', 'name', 'type', 'typeVersion', 'position', 'parameters', 'credentials'];
+          const extraFields = Object.keys(node).filter(field => !standardNodeFields.includes(field));
+          if (extraFields.length > 0) {
+            console.log(`⚠️ Node ${index} (${node.name}) has extra fields:`, extraFields);
+          }
+          
+          // Check for webhookId specifically
+          if (node.webhookId) {
+            console.log(`❌ Node ${index} (${node.name}) has webhookId field - this will cause validation failure`);
+          }
+          
+          // Check Google Drive parents structure
+          if (node.type === 'n8n-nodes-base.googleDrive' && node.parameters?.parents) {
+            console.log(`🔍 Google Drive node ${node.name} parents structure:`, JSON.stringify(node.parameters.parents));
+          }
+        });
+        
+        // Removed basic structure test - proceed directly with validation
+        // This allows the validation loop to handle errors and retry up to 5 times
         n8nValidationResult = await n8nValidator.validateAndFix(
-          workflow,
+          cleanedForValidation,
           input,
           {
             platform,
@@ -478,6 +641,7 @@ export async function POST(req) {
       complexity,
       ragEnhanced: useRAG,
       timing,
+      formatFixSuggestions: formatFixSuggestions,
       ...ragMetadata,
     };
 
@@ -635,25 +799,31 @@ export async function POST(req) {
 
     // Track analytics
     try {
-      await analytics.trackGeneration({
-        userId: req.headers.get('x-user-id') || 'anonymous',
-        platform,
-        input,
-        success: true,
-        generationTime: timing.total,
-        tokensUsed: inputTokens + outputTokens,
-        complexity: complexity === 'simple' ? 30 : complexity === 'moderate' ? 60 : 90,
-        workflowId: cleanedWorkflow.id || Date.now().toString(),
-        n8nValidation: n8nValidationResult ? {
-          tested: true,
-          success: n8nValidationResult.success,
-          attempts: n8nValidationResult.attempts,
-          validationTime: timing.n8nValidation
-        } : null
-      });
+      // Check if analytics and the method exist
+      if (analytics && typeof analytics.trackGeneration === 'function') {
+        await analytics.trackGeneration({
+          userId: req.headers.get('x-user-id') || 'anonymous',
+          platform,
+          input,
+          success: true,
+          generationTime: timing.total,
+          tokensUsed: inputTokens + outputTokens,
+          complexity: complexity === 'simple' ? 30 : complexity === 'moderate' ? 60 : 90,
+          workflowId: cleanedWorkflow.id || Date.now().toString(),
+          n8nValidation: n8nValidationResult ? {
+            tested: true,
+            success: n8nValidationResult.success,
+            attempts: n8nValidationResult.attempts,
+            validationTime: timing.n8nValidation
+          } : null
+        });
+      } else {
+        console.log('Analytics tracking not available - trackGeneration method missing');
+      }
 
       // Track n8n validation separately if it was performed
-      if (n8nValidationResult && n8nValidationResult.validated) {
+      if (n8nValidationResult && n8nValidationResult.validated && 
+          analytics && typeof analytics.trackN8nValidation === 'function') {
         const lastError = n8nValidationResult.history?.find(h => !h.success);
         await analytics.trackN8nValidation({
           workflowId: cleanedWorkflow.id || Date.now().toString(),

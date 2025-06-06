@@ -121,11 +121,22 @@ Your ENTIRE response must be ONLY the JSON object with ONLY standard fields.`);
 - Integration patterns and error handling
 - Platform-specific node configurations
 
+Your response MUST be a complete workflow object with these exact top-level fields:
+{
+  "name": "Workflow Name",
+  "nodes": [/* array of node objects */],
+  "connections": {/* connection mappings */},
+  "settings": {/* workflow settings */}
+}
+
+NEVER return just node parameters or partial structures. Always return a COMPLETE workflow.
+
 Your responses must be:
 1. Valid, executable JSON that exactly matches ${platform} specifications
 2. Optimized for ${complexity} complexity workflows
 3. Free of any explanatory text - only JSON output
 4. Complete with all required parameters and configurations
+5. A COMPLETE workflow structure, not individual node parameters
 
 Critical: You must respond with ONLY valid JSON. No markdown, no explanations, no commentary.`;
   }
@@ -1072,6 +1083,23 @@ NO OTHER FIELDS ARE ALLOWED!`;
    */
   buildCriticalInstructions() {
     return `## ‼️ CRITICAL INSTRUCTIONS - READ CAREFULLY ‼️
+  
+  🚨 WORKFLOW STRUCTURE REQUIREMENT 🚨
+  You MUST return a COMPLETE workflow object, NOT individual node parameters!
+  
+  CORRECT format:
+  {
+    "name": "Workflow Name",
+    "nodes": [...],
+    "connections": {...},
+    "settings": {...}
+  }
+  
+  INCORRECT format (DO NOT DO THIS):
+  {
+    "labelIds": ["INBOX"],
+    "includeAttachments": false
+  }
   
   YOU MUST ONLY OUTPUT A JSON OBJECT WITH THESE EXACT FIELDS:
   

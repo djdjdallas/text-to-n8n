@@ -422,6 +422,7 @@ export class WorkflowFormatFixer {
         }
         // Fix Google Drive nodes
         if (node.type === "n8n-nodes-base.googleDrive") {
+          console.log(`🔧 Processing Google Drive node: ${node.name}`);
           this.fixGoogleDriveNode(node);
         }
 
@@ -520,8 +521,9 @@ export class WorkflowFormatFixer {
     // 10. Debug output for troubleshooting (commented out in production)
     // this.debugWorkflow(fixed);
 
-    // 11. Generate node replacement suggestions
-    fixed.suggestions = this.suggestNodeReplacements(fixed);
+    // 11. Generate node replacement suggestions (store separately)
+    // NOTE: suggestions should NOT be added to the workflow object itself
+    // They are stored in the return value metadata instead
 
     // Add debug method for detailed structure inspection
     this.debugWorkflowStructure(fixed);
@@ -529,7 +531,14 @@ export class WorkflowFormatFixer {
     // Debug logging to confirm completion
     console.log("✅ formatFixer.fixN8nWorkflow completed!");
     
-    return fixed;
+    // Generate suggestions separately from the workflow
+    const suggestions = this.suggestNodeReplacements(fixed);
+    
+    // Return workflow and suggestions separately
+    return {
+      workflow: fixed,
+      suggestions: suggestions
+    };
   }
   
   /**
@@ -641,6 +650,34 @@ export class WorkflowFormatFixer {
         delete node.parameters.binary;
         // Set the correct binary property name
         node.parameters.binaryPropertyName = "data";
+      }
+
+      // Fix parents format - common issue causing validation errors
+      if (node.parameters.parents) {
+        // Log current format
+        console.log(`  Current parents format:`, JSON.stringify(node.parameters.parents));
+        
+        // Fix all possible wrong formats
+        if (typeof node.parameters.parents === 'object' && node.parameters.parents.values) {
+          // Wrong format: {"values":[{"id":"root"}]}
+          const parentIds = node.parameters.parents.values.map(v => v.id || 'root');
+          node.parameters.parents = parentIds;
+          console.log(`  ✅ Fixed to:`, JSON.stringify(node.parameters.parents));
+        } else if (typeof node.parameters.parents === 'string') {
+          // If it's a single string, convert to array
+          node.parameters.parents = [node.parameters.parents];
+          console.log(`  ✅ Converted string to array:`, JSON.stringify(node.parameters.parents));
+        } else if (!Array.isArray(node.parameters.parents)) {
+          // If it's any other format, default to ["root"]
+          node.parameters.parents = ["root"];
+          console.log(`  ✅ Set default parents: ["root"]`);
+        }
+      }
+
+      // Also check for binaryData flag
+      if (node.parameters.binaryData === true && !node.parameters.binaryPropertyName) {
+        node.parameters.binaryPropertyName = "data";
+        console.log(`  ✅ Added missing binaryPropertyName`);
       }
 
       // Fix folder ID reference
@@ -959,6 +996,16 @@ export class WorkflowFormatFixer {
             // Handle "exists" operation - it should have empty rightValue
             if (fixedCondition.operation === 'exists' || fixedCondition.operation === 'notExists') {
               fixedCondition.rightValue = '';
+            }
+            
+            // Fix IF nodes with empty rightValue for numeric comparisons
+            if ((fixedCondition.operation === 'largerThan' || 
+                 fixedCondition.operation === 'smallerThan' || 
+                 fixedCondition.operation === 'largerOrEqual' || 
+                 fixedCondition.operation === 'smallerOrEqual') && 
+                (fixedCondition.rightValue === '' || fixedCondition.rightValue === null || fixedCondition.rightValue === undefined)) {
+              fixedCondition.rightValue = 0;
+              console.log(`  ✅ Fixed IF node: empty rightValue → 0 for ${fixedCondition.operation}`);
             }
 
             return fixedCondition;
