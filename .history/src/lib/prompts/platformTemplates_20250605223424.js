@@ -248,7 +248,7 @@ Response format: Valid JSON only, no explanations or markdown.`;
       "## Documentation Context\nRelevant documentation for your request:\n\n";
 
     relevantDocs.forEach((doc, index) => {
-      context += `### ${index + 1}. ${doc.title}\n`;
+      context += `### ${doc.title}\n`;
       context += `${doc.content}\n\n`;
 
       if (doc.metadata?.parameters) {

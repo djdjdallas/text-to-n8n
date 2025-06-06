@@ -1,5 +1,6 @@
 import { anthropicClient } from '../ai/anthropicClient.js';
-import { platformTemplates } from '../prompts/platformTemplates.js';
+import { promptGenerator } from '../prompts/platformTemplates.js';
+import { claudeOptimizer } from '../prompts/claudeTemplates.js';
 import crypto from 'crypto';
 
 // Validation cache with TTL
@@ -671,7 +672,7 @@ ${JSON.stringify(currentWorkflow, null, 2)}
         model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4000,
         temperature: 0.3,
-        system: platformTemplates[platform].system,
+        system: claudeOptimizer.generateSystemPrompt(platform),
         messages
       });
 

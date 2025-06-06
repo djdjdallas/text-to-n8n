@@ -344,3 +344,103 @@ class WorkflowAnalytics {
 }
 
 export const analytics = new WorkflowAnalytics();
+
+// src/app/api/analytics/dashboard/route.js
+import { analytics } from "@/lib/monitoring/analytics";
+import { NextResponse } from "next/server";
+
+export async function GET(req) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const timeframe = searchParams.get("timeframe") || "7d";
+
+    const metrics = await analytics.getGenerationMetrics(timeframe);
+
+    return NextResponse.json(metrics);
+  } catch (error) {
+    console.error("Analytics error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch analytics" },
+      { status: 500 }
+    );
+  }
+}
+
+// src/components/AnalyticsDashboard.jsx
+import { useEffect, useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/Card";
+
+export function AnalyticsDashboard() {
+  const [metrics, setMetrics] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMetrics();
+  }, []);
+
+  const fetchMetrics = async () => {
+    try {
+      const response = await fetch("/api/analytics/dashboard?timeframe=7d");
+      const data = await response.json();
+      setMetrics(data);
+    } catch (error) {
+      console.error("Failed to fetch metrics:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) return <div>Loading analytics...</div>;
+  if (!metrics) return <div>No analytics data available</div>;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Generation Success Rate</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">
+            {(
+              (metrics.generations.successful / metrics.generations.total) *
+              100
+            ).toFixed(1)}
+            %
+          </div>
+          <p className="text-sm text-muted">
+            {metrics.generations.successful} of {metrics.generations.total}{" "}
+            successful
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Average Generation Time</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">
+            {(metrics.generations.avgGenerationTime / 1000).toFixed(2)}s
+          </div>
+          <p className="text-sm text-muted">Across all platforms</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Platform Distribution</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {Object.entries(metrics.generations.byPlatform).map(
+            ([platform, count]) => (
+              <div key={platform} className="flex justify-between mb-2">
+                <span className="capitalize">{platform}</span>
+                <span className="font-semibold">{count}</span>
+              </div>
+            )
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
