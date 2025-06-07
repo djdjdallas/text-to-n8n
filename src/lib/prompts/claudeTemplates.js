@@ -242,12 +242,22 @@ CRITICAL BUGS TO AVOID:
 
 1. IF NODE CONDITIONS:
    - NEVER use "number" field in conditions
+   - NEVER check ratings using email headers ({{$json["headers"]["from"]}})
+   - For rating checks, use the correct field: {{$json["rating"]}}
    - Use ONLY this structure:
      "conditions": {
        "conditions": [{
          "leftValue": "={{expression}}",
          "rightValue": "value",
          "operation": "equal"
+       }]
+     }
+   - CRITICAL RATING CHECK EXAMPLE:
+     "conditions": {
+       "conditions": [{
+         "leftValue": "={{$json[\"rating\"]}}",
+         "rightValue": 4,
+         "operation": "largerEqual"
        }]
      }
 
@@ -420,6 +430,14 @@ CRITICAL FORMAT REQUIREMENTS:
        "leftValue": "={{$json[\\"field\\"]}}",
        "rightValue": "",
        "operation": "exists"
+     - For checking numeric ratings (CRITICAL - COMMON ERROR):
+       "leftValue": "={{$json[\\"rating\\"]}}",
+       "rightValue": 4,
+       "operation": "largerEqual"
+     - WRONG rating check (causes errors):
+       "leftValue": "={{$json[\\"headers\\"][\\"from\\"]}}",
+       "rightValue": "",
+       "operation": "equal"
   
   4. GOOGLE DRIVE NODE:
      - CRITICAL: Always include "resource" parameter:

@@ -21,6 +21,11 @@ export class AnthropicClient {
    * Generate workflow JSON using Claude
    */
   async generateWorkflow(prompt, options = {}) {
+    // Handle both string prompts and enhanced prompt objects
+    const enhancedPromptData = typeof prompt === 'object' && prompt.enhanced 
+      ? prompt 
+      : { enhanced: prompt, template: null };
+    
     const {
       model = this.defaultModel,
       maxTokens = 4000,
@@ -29,11 +34,11 @@ export class AnthropicClient {
       complexity = "moderate",
     } = options;
 
-    // Claude-optimized system prompt
-    const systemPrompt = this.buildSystemPrompt(platform, complexity);
+    // Claude-optimized system prompt with template injection
+    const systemPrompt = this.buildSystemPrompt(platform, complexity, enhancedPromptData.template);
 
     // Format user prompt for Claude's strengths
-    const formattedPrompt = this.formatPromptForClaude(prompt, platform);
+    const formattedPrompt = this.formatPromptForClaude(enhancedPromptData.enhanced || prompt, platform);
 
     const requestBody = {
       model,
@@ -54,7 +59,7 @@ export class AnthropicClient {
   /**
    * Build system prompt optimized for Claude
    */
-  buildSystemPrompt(platform, complexity) {
+  buildSystemPrompt(platform, complexity, template = null) {
     const basePrompt = `You are an expert automation engineer specializing in ${platform} workflows.
   
   CRITICAL REQUIREMENTS:
@@ -81,6 +86,40 @@ export class AnthropicClient {
       "settings": {workflow settings}
     }`;
 
+    // Add template reference if available
+    const templateSection = template
+      ? `\n\nREFERENCE TEMPLATE:\nFor this type of workflow, here's a working example structure:\n${JSON.stringify(template.template, null, 2)}\n\nIMPORTANT: Use this as a reference but adapt it to the specific requirements.\n`
+      : '';
+
+    // Add platform-specific critical rules
+    const n8nCriticalRules = platform === 'n8n' 
+      ? `\n\nCRITICAL N8N-SPECIFIC RULES:
+  1. Slack nodes: ALWAYS prefix channels with '#' (e.g., "#general", NOT "general")
+  2. Gmail nodes: Use "gmailOAuth2" for credentials, NOT "gmailOAuth2Api"
+  3. Google Drive nodes: MUST include the __rl resource locator structure:
+     {
+       "driveId": {
+         "__rl": true,
+         "mode": "list",
+         "value": "My Drive"
+       },
+       "folderId": {
+         "__rl": true,
+         "mode": "list",
+         "value": "root",
+         "cachedResultName": "/ (Root folder)"
+       },
+       "options": {}
+     }
+  4. Schedule triggers: MUST include timezone parameter (e.g., "America/Los_Angeles")
+  5. Expressions: Use {{$json["field"]}} or {{$json.field}}, NOT {{$json[\"field\"]}}
+  6. Gmail trigger outputs: Use {{$json["headers"]["from"]}} NOT {{$json.from}}
+  7. IF nodes: Use proper operations (equal, contains, largerThan) not complex expressions
+  8. Set nodes: Don't use keepOnlySet parameter
+  9. Webhook nodes: Don't include webhookId field
+  10. All Google Drive nodes MUST have an options field (even if empty: options: {})\n`
+      : '';
+
     const complexityInstructions = {
       simple:
         "- Keep workflows straightforward with minimal conditional logic\n- Focus on basic trigger → action patterns",
@@ -90,7 +129,7 @@ export class AnthropicClient {
         "- Implement sophisticated error handling and retry logic\n- Use advanced features like sub-workflows, aggregators, and complex routing",
     };
 
-    return `${basePrompt}\n\nComplexity Level: ${complexity}\n${
+    return `${basePrompt}${templateSection}${n8nCriticalRules}\n\nComplexity Level: ${complexity}\n${
       complexityInstructions[complexity] || complexityInstructions.moderate
     }`;
   }

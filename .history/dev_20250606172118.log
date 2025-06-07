@@ -1,0 +1,3147 @@
+
+> ai-automation@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.3.3
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.0.161:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1410ms
+ ○ Compiling /api/generate/v2 ...
+ ✓ Compiled /api/generate/v2 in 1224ms (902 modules)
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+🔧 Applying n8n format fixes...
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+Fixed mixed expression syntax in Set node value: message
+ℹ️ Processed Slack node "Send to Slack" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: errorMessage
+Fixed mixed expression syntax in Set node value: message
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Check VIP Email (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"headers\"][\"from\"]}}",
+        "rightValue": "vip@company.com",
+        "operation": "contains"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Prepare Slack Message (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "message",
+        "value": "🔴 VIP EMAIL RECEIVED 🔴\n\nFrom: {{$json[\"headers\"][\"from\"]}}\nSubject: {{$json[\"headers\"][\"subject\"]}}\n\nMessage:\n{{$json[\"textPlain\"] || \"No text content\"}}"
+      }
+    ]
+  }
+}
+
+Node 3: Send to Slack (n8n-nodes-base.slack)
+Parameters: {
+  "authentication": "accessToken",
+  "operation": "post",
+  "channel": "#vip-notifications",
+  "text": "{{$json.message}}"
+}
+
+Node 4: Slack Error Handler (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "errorMessage",
+        "value": "Error sending VIP email to Slack: {{$json.error}}"
+      }
+    ]
+  }
+}
+
+Node 5: Log Error (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "error"
+      },
+      {
+        "name": "message",
+        "value": "{{$json.errorMessage || \"Unknown error occurred\"}}"
+      }
+    ]
+  }
+}
+
+Node 6: Not VIP Email (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "skipped"
+      },
+      {
+        "name": "message",
+        "value": "Email not from VIP sender"
+      }
+    ]
+  }
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Check VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Check VIP Email": {
+    "main": [
+      [
+        {
+          "node": "Prepare Slack Message",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Not VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Prepare Slack Message": {
+    "main": [
+      [
+        {
+          "node": "Send to Slack",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send to Slack": {
+    "main": [
+      [
+        {
+          "node": "Slack Error Handler",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Slack Error Handler": {
+    "main": [
+      [
+        {
+          "node": "Log Error",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, suggestions
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["headers"]["from"]}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  * Slack node Send to Slack: no otherOptions field found (good)
+⚠️ Removing non-allowed field from workflow: suggestions
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["headers"]["from"]}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+✅ Fixed Gmail credentials for node "Gmail Trigger" in final workflow
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail VIP Email to Slack",
+  "nodes": [
+    {
+      "id": "gmailTrigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "positi...
+ POST /api/generate/v2 200 in 28718ms
+Server error 529. Retrying (attempt 1)
+ POST /api/generate/v2 200 in 29989ms
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount
+🔧 Applying n8n format fixes...
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+Fixed mixed expression syntax in Set node value: message
+ℹ️ Processed Slack node "Send to Slack" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: errorDetails
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Check VIP Email (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"headers\"][\"from\"]}}",
+        "rightValue": "vip@company.com",
+        "operation": "contains"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Prepare Slack Message (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "message",
+        "value": "🔴 VIP EMAIL RECEIVED 🔴\n\nFrom: {{$json[\"headers\"][\"from\"]}}\nSubject: {{$json[\"headers\"][\"subject\"]}}\n\nMessage:\n{{$json[\"textPlain\"] || \"No text content\"}}"
+      }
+    ]
+  }
+}
+
+Node 3: Send to Slack (n8n-nodes-base.slack)
+Parameters: {
+  "authentication": "accessToken",
+  "operation": "post",
+  "channel": "#vip-notifications",
+  "text": "{{$json.message}}"
+}
+
+Node 4: Slack Success (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "success"
+      },
+      {
+        "name": "message",
+        "value": "VIP email successfully sent to Slack"
+      }
+    ]
+  }
+}
+
+Node 5: Slack Error (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "error"
+      },
+      {
+        "name": "message",
+        "value": "Failed to send VIP email to Slack"
+      },
+      {
+        "name": "errorDetails",
+        "value": "{{$json.error}}"
+      }
+    ]
+  }
+}
+
+Node 6: Not VIP Email (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "skipped"
+      },
+      {
+        "name": "message",
+        "value": "Email not from VIP sender"
+      }
+    ]
+  }
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Check VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Check VIP Email": {
+    "main": [
+      [
+        {
+          "node": "Prepare Slack Message",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Not VIP Email",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Prepare Slack Message": {
+    "main": [
+      [
+        {
+          "node": "Send to Slack",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send to Slack": {
+    "main": [
+      [
+        {
+          "node": "Slack Success",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ],
+    "error": [
+      [
+        {
+          "node": "Slack Error",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Slack Success": {
+    "main": [
+      []
+    ]
+  },
+  "Slack Error": {
+    "main": [
+      []
+    ]
+  },
+  "Not VIP Email": {
+    "main": [
+      []
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount, suggestions
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["headers"]["from"]}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  * Slack node Send to Slack: no otherOptions field found (good)
+⚠️ Removing non-allowed field from workflow: suggestions
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["headers"]["from"]}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2Api":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+✅ Fixed Gmail credentials for node "Gmail Trigger" in final workflow
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active, triggerCount
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail VIP Email to Slack",
+  "nodes": [
+    {
+      "id": "gmailTrigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "positi...
+ ✓ Compiled /middleware in 352ms (248 modules)
+Middleware session check: {
+  path: '/dashboard',
+  hasSession: true,
+  userId: 'd793c480-f6f8-4e5e-8630-05f16d533687',
+  emailConfirmed: true
+}
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 1461ms (909 modules)
+ GET /dashboard 200 in 1614ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 711ms (913 modules)
+ GET /_next/static/chunks/main-app.js?v=1749169253503 404 in 790ms
+Middleware session check: {
+  path: '/dashboard',
+  hasSession: true,
+  userId: 'd793c480-f6f8-4e5e-8630-05f16d533687',
+  emailConfirmed: true
+}
+ GET /dashboard 200 in 54ms
+ GET /_next/static/chunks/main-app.js?v=1749169265032 404 in 26ms
+Middleware session check: {
+  path: '/',
+  hasSession: true,
+  userId: 'd793c480-f6f8-4e5e-8630-05f16d533687',
+  emailConfirmed: true
+}
+ ○ Compiling / ...
+ ✓ Compiled / in 585ms (1012 modules)
+ GET / 200 in 797ms
+ GET /_next/static/chunks/main-app.js?v=1749169268653 404 in 47ms
+ ✓ Compiled in 1508ms (430 modules)
+ ✓ Compiled in 1283ms (430 modules)
+ ✓ Compiled in 708ms (430 modules)
+ ✓ Compiled in 1386ms (430 modules)
+ ✓ Compiled in 206ms (430 modules)
+ ✓ Compiled in 390ms (430 modules)
+ ✓ Compiled in 224ms (430 modules)
+ ✓ Compiled in 339ms (430 modules)
+ ✓ Compiled in 335ms (430 modules)
+ ✓ Compiled in 197ms (430 modules)
+ ✓ Compiled in 380ms (664 modules)
+ ✓ Compiled in 284ms (430 modules)
+ ✓ Compiled in 976ms (430 modules)
+ ✓ Compiled in 244ms (430 modules)
+ ✓ Compiled in 234ms (430 modules)
+ ✓ Compiled in 138ms (430 modules)
+ ✓ Compiled in 128ms (430 modules)
+ ✓ Compiled in 204ms (430 modules)
+ ✓ Compiled in 224ms (430 modules)
+ ✓ Compiled in 236ms (430 modules)
+ ✓ Compiled in 202ms (430 modules)
+ ✓ Compiled in 243ms (430 modules)
+ ✓ Compiled in 397ms (430 modules)
+ ✓ Compiled in 229ms (430 modules)
+ ✓ Compiled in 251ms (430 modules)
+ ✓ Compiled in 446ms (678 modules)
+ ✓ Compiled in 187ms (430 modules)
+ ✓ Compiled in 200ms (430 modules)
+ ✓ Compiled in 301ms (430 modules)
+ ✓ Compiled in 427ms (430 modules)
+ ✓ Compiled in 343ms (437 modules)
+ ✓ Compiled in 273ms (437 modules)
+ ✓ Compiled in 238ms (437 modules)
+[Error: Cannot apply unknown utility class `bg-background`. Are you using CSS modules or similar and missing `@reference`? https://tailwindcss.com/docs/functions-and-directives#reference-directive]
+ ✓ Compiled in 176ms (448 modules)
+ ✓ Compiled in 163ms (439 modules)
+ ✓ Compiled in 341ms (439 modules)
+ ✓ Compiled in 314ms (439 modules)
+ ✓ Compiled in 239ms (439 modules)
+ ✓ Compiled in 246ms (439 modules)
+ ✓ Compiled in 214ms (439 modules)
+ ✓ Compiled in 373ms (439 modules)
+ ✓ Compiled in 199ms (439 modules)
+ ✓ Compiled in 350ms (439 modules)
+ ✓ Compiled in 261ms (439 modules)
+[Error: Cannot apply unknown utility class `bg-background`. Are you using CSS modules or similar and missing `@reference`? https://tailwindcss.com/docs/functions-and-directives#reference-directive]
+ ✓ Compiled in 240ms (448 modules)
+ ✓ Compiled in 183ms (442 modules)
+ ✓ Compiled in 318ms (442 modules)
+ ✓ Compiled in 236ms (442 modules)
+ ✓ Compiled in 364ms (442 modules)
+ ✓ Compiled in 224ms (442 modules)
+ ✓ Compiled in 194ms (442 modules)
+ ✓ Compiled in 158ms (442 modules)
+ ✓ Compiled in 228ms (442 modules)
+ ✓ Compiled in 267ms (442 modules)
+   Reload env: .env.local
+ ✓ Compiled in 1585ms (676 modules)
+ ✓ Compiled in 684ms (442 modules)
+ ✓ Compiled in 372ms (442 modules)
+ ✓ Compiled in 449ms (442 modules)
+ ✓ Compiled in 236ms (442 modules)
+ ✓ Compiled in 201ms (442 modules)
+ ✓ Compiled in 297ms (442 modules)
+ ✓ Compiled in 218ms (442 modules)
+ ✓ Compiled in 612ms (442 modules)
+ ✓ Compiled in 192ms (442 modules)
+ ✓ Compiled in 359ms (442 modules)
+ ✓ Compiled in 364ms (442 modules)
+ ✓ Compiled in 372ms (442 modules)
+ ✓ Compiled in 1501ms (442 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 327ms (442 modules)
+ ✓ Compiled in 234ms (442 modules)
+ ✓ Compiled in 373ms (442 modules)
+ ✓ Compiled in 833ms (442 modules)
+ ✓ Compiled in 238ms (442 modules)
+ ✓ Compiled in 319ms (442 modules)
+ ✓ Compiled in 305ms (442 modules)
+ ✓ Compiled in 251ms (442 modules)
+ ✓ Compiled in 296ms (442 modules)
+ ✓ Compiled in 226ms (442 modules)
+ ✓ Compiled in 158ms (442 modules)
+ ✓ Compiled in 427ms (442 modules)
+ ✓ Compiled in 742ms (442 modules)
+ ✓ Compiled in 387ms (442 modules)
+ ✓ Compiled in 368ms (442 modules)
+ ✓ Compiled in 311ms (442 modules)
+ ✓ Compiled in 327ms (442 modules)
+ ✓ Compiled in 752ms (442 modules)
+ ✓ Compiled in 292ms (442 modules)
+ ✓ Compiled in 381ms (442 modules)
+ ✓ Compiled in 255ms (442 modules)
+ ✓ Compiled in 239ms (442 modules)
+ ✓ Compiled in 584ms (442 modules)
+ ✓ Compiled in 443ms (442 modules)
+ ✓ Compiled in 456ms (442 modules)
+ ✓ Compiled in 289ms (442 modules)
+ ✓ Compiled in 399ms (442 modules)
+ ✓ Compiled in 2.8s (442 modules)
+ ✓ Compiled in 289ms (442 modules)
+ ✓ Compiled in 424ms (442 modules)
+ ✓ Compiled in 399ms (442 modules)
+ ✓ Compiled in 272ms (442 modules)
+ ✓ Compiled in 231ms (442 modules)
+ ✓ Compiled in 256ms (442 modules)
+ ✓ Compiled in 262ms (442 modules)
+ ✓ Compiled in 337ms (442 modules)
+ ✓ Compiled in 446ms (442 modules)
+ ✓ Compiled in 232ms (442 modules)
+ ✓ Compiled in 167ms (442 modules)
+ ✓ Compiled in 340ms (442 modules)
+ ✓ Compiled in 2.6s (442 modules)
+ ✓ Compiled in 696ms (442 modules)
+ ✓ Compiled in 828ms (442 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 1351ms (442 modules)
+ ✓ Compiled in 327ms (442 modules)
+ ✓ Compiled in 185ms (442 modules)
+ ✓ Compiled in 262ms (442 modules)
+ ✓ Compiled in 191ms (442 modules)
+ ✓ Compiled in 177ms (442 modules)
+ ✓ Compiled in 208ms (442 modules)
+ ✓ Compiled in 272ms (442 modules)
+ ✓ Compiled in 411ms (442 modules)
+ ✓ Compiled in 400ms (442 modules)
+ ✓ Compiled in 333ms (442 modules)
+ ✓ Compiled in 248ms (442 modules)
+ ✓ Compiled in 1034ms (442 modules)
+ ✓ Compiled in 462ms (442 modules)
+ ✓ Compiled in 249ms (442 modules)
+ ✓ Compiled in 471ms (442 modules)
+ ✓ Compiled in 582ms (442 modules)
+ ✓ Compiled in 190ms (442 modules)
+ ✓ Compiled in 254ms (442 modules)
+ ○ Compiling /api/generate/v2 ...
+ ✓ Compiled /api/generate/v2 in 1233ms (1137 modules)
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+🔧 Applying n8n format fixes...
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+  ✅ Fixed Slack expression: ⚠️ Gmail to Slack workflow error at {{$json["times...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+ℹ️ Processed Slack node "Send to Slack" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: timestamp
+ℹ️ Processed Slack node "Send Error Alert" - ensured no otherOptions field
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ]
+}
+
+Node 1: Send to Slack (n8n-nodes-base.slack)
+Parameters: {
+  "operation": "post",
+  "authentication": "accessToken",
+  "channel": "#general",
+  "text": "📧 New Email Received\n\n**From:** {{$json[\"headers\"][\"from\"]}}\n**Subject:** {{$json[\"headers\"][\"subject\"]}}"
+}
+
+Node 2: Set Error Message (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "error",
+        "value": "Failed to send Slack notification"
+      },
+      {
+        "name": "timestamp",
+        "value": "{{new Date().toISOString()}}"
+      }
+    ]
+  }
+}
+
+Node 3: Send Error Alert (n8n-nodes-base.slack)
+Parameters: {
+  "operation": "post",
+  "authentication": "accessToken",
+  "channel": "#general",
+  "text": "⚠️ Gmail to Slack workflow error at {{$json.timestamp}}"
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Send to Slack",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send to Slack": {
+    "main": [
+      [
+        {
+          "node": "Set Error Message",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Set Error Message": {
+    "main": [
+      [
+        {
+          "node": "Send Error Alert",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔍 Starting n8n validation and auto-fix loop...
+🧹 Strict cleaning complete. Removed any non-standard fields.
+🧹 Created strictly cleaned workflow for n8n validation
+🔍 Workflow being sent to n8n validation:
+📋 Top-level fields: [ 'name', 'nodes', 'connections', 'settings' ]
+📋 Node count: 4
+Starting n8n validation loop...
+Validation attempt 1/3
+🔍 Sending to n8n API: {
+  "name": "Test_1749227169307",
+  "nodes": [
+    {
+      "id": "gmail1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "labelIds": [
+          "INBOX"
+        ]
+      }
+    },
+    {
+      "id": "slack1",
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        650,
+        300
+      ],
+      "parameters": {
+        "operation": "post",
+        "authentication": "accessToken",
+        "channel": "#general",
+        "text": "📧 New Email Received\n\n**From:** {{$json[\"headers\"][\"from\"]}}\n**Subject:** {{$json[\"headers\"][\"subject\"]}}"
+      }
+    },
+    {
+      "id": "fj900mvs",
+      "name": "Set Error Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        650,
+        500
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "error",
+              "value": "Failed to send Slack notification"
+            },
+            {
+              "name": "timestamp",
+              "value": "{{new Date().toISOString()}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "slack2",
+      "name": "Send Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        850,
+        500
+      ],
+      "parameters": {
+        "operation": "post",
+        "authentication": "accessToken",
+        "channel": "#general",
+        "text": "⚠️ Gmail to Slack workflow error at {{$json.timestamp}}"
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Slack": {
+      "main": [
+        [
+          {
+            "node": "Set Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Error Message": {
+      "main": [
+        [
+          {
+            "node": "Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": false,
+    "saveManualExecutions": true,
+    "executionTimeout": -1,
+    "timezone": "America/New_York"
+  }
+}
+Workflow validated successfully!
+✅ Workflow validated and fixed after 1 attempts
+Cleanup completed
+🔍 Sample expression check BEFORE cleaning:
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  * Slack node Send to Slack: no otherOptions field found (good)
+  * Slack node Send Error Alert: no otherOptions field found (good)
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+    * Send to Slack: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail to Slack Notification",
+  "nodes": [
+    {
+      "id": "gmail1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position"...
+Analytics tracking not available - trackGeneration method missing
+ POST /api/generate/v2 200 in 40487ms
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+    * Send Success Notification: has otherOptions = false
+    * Send Error Notification: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+    * Download Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+🔧 Applying n8n format fixes...
+🔍 Google Drive nodes BEFORE formatFixer:
+  - Save PDF to Drive: parents = ["PDFs"]
+  - Save Image to Drive: parents = ["Images"]
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+  ✅ Fixed Slack expression: ✅ File processed successfully!
+
+📧 From: {{$json["...
+  ✅ Fixed Slack expression: ⚠️ Unsupported file type!
+
+📎 File: {{$json["filen...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+    ✅ Fixed Gmail fields in Slack text: ✅ File processed successfully!...
+  ✅ Fixed IF node: empty rightValue → 0 for largerThan
+🔧 Processing Google Drive node: Save PDF to Drive
+🔧 Processing Google Drive node: Save Image to Drive
+Fixed mixed expression syntax in Set node value: filename
+Fixed mixed expression syntax in Set node value: fileType
+Fixed mixed expression syntax in Set node value: from
+Fixed mixed expression syntax in Set node value: subject
+ℹ️ Processed Slack node "Send Success Notification" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: filename
+Fixed mixed expression syntax in Set node value: fileType
+ℹ️ Processed Slack node "Send Error Notification" - ensured no otherOptions field
+Fixed mixed expression syntax in Set node value: from
+Fixed mixed expression syntax in Set node value: subject
+ℹ️ Processed Slack node "Send Error Alert" - ensured no otherOptions field
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Has Attachments? (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"attachments\"].length}}",
+        "rightValue": 0,
+        "operation": "largerThan"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Loop Over Attachments (n8n-nodes-base.splitInBatches)
+Parameters: {
+  "batchSize": 1
+}
+
+Node 3: Download Attachment (n8n-nodes-base.gmail)
+Parameters: {
+  "operation": "getAttachment",
+  "messageId": "={{$node[\"Gmail Trigger\"].json[\"id\"]}}",
+  "attachmentId": "={{$json[\"attachments\"][0][\"id\"]}}"
+}
+
+Node 4: Check File Type (n8n-nodes-base.switch)
+Parameters: {
+  "dataType": "string",
+  "value1": "={{$json[\"attachments\"][0][\"mimeType\"]}}",
+  "rules": {
+    "rules": [
+      {
+        "value2": "application/pdf",
+        "operation": "equal"
+      },
+      {
+        "value2": "image/jpeg",
+        "operation": "equal"
+      },
+      {
+        "value2": "image/png",
+        "operation": "equal"
+      },
+      {
+        "value2": "image/gif",
+        "operation": "equal"
+      }
+    ]
+  },
+  "fallbackOutput": 4
+}
+
+Node 5: Save PDF to Drive (n8n-nodes-base.googleDrive)
+Parameters: {
+  "operation": "upload",
+  "name": "={{$json[\"attachments\"][0][\"filename\"]}}",
+  "parents": [
+    "PDFs"
+  ],
+  "binaryPropertyName": "data"
+}
+
+Node 6: Resize Image (n8n-nodes-base.editImage)
+Parameters: {
+  "operation": "resize",
+  "width": 800,
+  "height": 600
+}
+
+Node 7: Save Image to Drive (n8n-nodes-base.googleDrive)
+Parameters: {
+  "operation": "upload",
+  "name": "={{$json[\"attachments\"][0][\"filename\"]}}",
+  "parents": [
+    "Images"
+  ],
+  "binaryPropertyName": "data"
+}
+
+Node 8: Prepare Success Data (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "success"
+      },
+      {
+        "name": "filename",
+        "value": "{{$json[\"attachments\"][0][\"filename\"]}}"
+      },
+      {
+        "name": "fileType",
+        "value": "{{$json[\"attachments\"][0][\"mimeType\"]}}"
+      },
+      {
+        "name": "from",
+        "value": "{{$node[\"Gmail Trigger\"].json[\"headers\"][\"from\"]}}"
+      },
+      {
+        "name": "subject",
+        "value": "{{$node[\"Gmail Trigger\"].json[\"headers\"][\"subject\"]}}"
+      }
+    ]
+  }
+}
+
+Node 9: Send Success Notification (n8n-nodes-base.slack)
+Parameters: {
+  "operation": "post",
+  "authentication": "accessToken",
+  "channel": "#file-uploads",
+  "text": "✅ File processed successfully!\n\n📧 From: {{$json[\"headers\"][\"from\"]}}\n📋 Subject: {{$json[\"headers\"][\"subject\"]}}\n📎 File: {{$json.filename}}\n🗂️ Type: {{$json.fileType}}"
+}
+
+Node 10: Prepare Error Data (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "error"
+      },
+      {
+        "name": "message",
+        "value": "Unsupported file type"
+      },
+      {
+        "name": "filename",
+        "value": "{{$json[\"attachments\"][0][\"filename\"]}}"
+      },
+      {
+        "name": "fileType",
+        "value": "{{$json[\"attachments\"][0][\"mimeType\"]}}"
+      }
+    ]
+  }
+}
+
+Node 11: Send Error Notification (n8n-nodes-base.slack)
+Parameters: {
+  "operation": "post",
+  "authentication": "accessToken",
+  "channel": "#file-uploads",
+  "text": "⚠️ Unsupported file type!\n\n📎 File: {{$json.filename}}\n🗂️ Type: {{$json.fileType}}\n\nOnly PDFs and images (JPEG, PNG, GIF) are supported."
+}
+
+Node 12: No Attachments Data (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "no_attachments"
+      },
+      {
+        "name": "from",
+        "value": "{{$json[\"headers\"][\"from\"]}}"
+      },
+      {
+        "name": "subject",
+        "value": "{{$json[\"headers\"][\"subject\"]}}"
+      }
+    ]
+  }
+}
+
+Node 13: Error Handler (n8n-nodes-base.errorTrigger)
+Parameters: {}
+
+Node 14: Send Error Alert (n8n-nodes-base.slack)
+Parameters: {
+  "operation": "post",
+  "authentication": "accessToken",
+  "channel": "#errors",
+  "text": "🚨 Workflow Error!\n\nWorkflow: Gmail Attachment Processor\nError: {{$json[\"error\"][\"message\"]}}\nNode: {{$json[\"error\"][\"node\"][\"name\"]}}"
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Has Attachments?",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Has Attachments?": {
+    "main": [
+      [
+        {
+          "node": "Loop Over Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "No Attachments Data",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Loop Over Attachments": {
+    "main": [
+      [
+        {
+          "node": "Download Attachment",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Download Attachment": {
+    "main": [
+      [
+        {
+          "node": "Check File Type",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Check File Type": {
+    "main": [
+      [
+        {
+          "node": "Save PDF to Drive",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Resize Image",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Resize Image",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Resize Image",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Prepare Error Data",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Save PDF to Drive": {
+    "main": [
+      [
+        {
+          "node": "Prepare Success Data",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Resize Image": {
+    "main": [
+      [
+        {
+          "node": "Save Image to Drive",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Save Image to Drive": {
+    "main": [
+      [
+        {
+          "node": "Prepare Success Data",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Prepare Success Data": {
+    "main": [
+      [
+        {
+          "node": "Send Success Notification",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send Success Notification": {
+    "main": [
+      [
+        {
+          "node": "Loop Over Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Prepare Error Data": {
+    "main": [
+      [
+        {
+          "node": "Send Error Notification",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Send Error Notification": {
+    "main": [
+      [
+        {
+          "node": "Loop Over Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Error Handler": {
+    "main": [
+      [
+        {
+          "node": "Send Error Alert",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+🔍 Google Drive nodes AFTER formatFixer:
+  - Save PDF to Drive: parents = ["PDFs"]
+  - Save Image to Drive: parents = ["Images"]
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+    * Send Success Notification: has otherOptions = false
+    * Send Error Notification: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+    * Download Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔍 Starting n8n validation and auto-fix loop...
+🧹 Strict cleaning complete. Removed any non-standard fields.
+🧹 Created strictly cleaned workflow for n8n validation
+🔍 Workflow being sent to n8n validation:
+📋 Top-level fields: [ 'name', 'nodes', 'connections', 'settings' ]
+📋 Node count: 15
+🔍 Google Drive node Save PDF to Drive parents structure: ["PDFs"]
+🔍 Google Drive node Save Image to Drive parents structure: ["Images"]
+Starting n8n validation loop...
+
+🔍 Google Drive nodes at Initial validation:
+  - Save PDF to Drive:
+    parents: ["PDFs"]
+    operation: upload
+  - Save Image to Drive:
+    parents: ["Images"]
+    operation: upload
+Validation attempt 1/3
+🔍 Sending to n8n API: {
+  "name": "Test_1749227243933",
+  "nodes": [
+    {
+      "id": "gmail1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "labelIds": [
+          "INBOX"
+        ],
+        "includeAttachments": true
+      }
+    },
+    {
+      "id": "r9zhrpc7",
+      "name": "Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"attachments\"].length}}",
+              "rightValue": 0,
+              "operation": "largerThan"
+            }
+          ]
+        },
+        "combineOperation": "all"
+      }
+    },
+    {
+      "id": "loop1",
+      "name": "Loop Over Attachments",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        650,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "gmail2",
+      "name": "Download Attachment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        850,
+        200
+      ],
+      "parameters": {
+        "operation": "getAttachment",
+        "messageId": "={{$node[\"Gmail Trigger\"].json[\"id\"]}}",
+        "attachmentId": "={{$json[\"attachments\"][0][\"id\"]}}"
+      }
+    },
+    {
+      "id": "switch1",
+      "name": "Check File Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        200
+      ],
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json[\"attachments\"][0][\"mimeType\"]}}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "application/pdf",
+              "operation": "equal"
+            },
+            {
+              "value2": "image/jpeg",
+              "operation": "equal"
+            },
+            {
+              "value2": "image/png",
+              "operation": "equal"
+            },
+            {
+              "value2": "image/gif",
+              "operation": "equal"
+            }
+          ]
+        },
+        "fallbackOutput": 4
+      }
+    },
+    {
+      "id": "drive1",
+      "name": "Save PDF to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        100
+      ],
+      "parameters": {
+        "operation": "upload",
+        "name": "={{$json[\"attachments\"][0][\"filename\"]}}",
+        "parents": [
+          "PDFs"
+        ],
+        "binaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "image1",
+      "name": "Resize Image",
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        250
+      ],
+      "parameters": {
+        "operation": "resize",
+        "width": 800,
+        "height": 600
+      }
+    },
+    {
+      "id": "drive2",
+      "name": "Save Image to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1450,
+        250
+      ],
+      "parameters": {
+        "operation": "upload",
+        "name": "={{$json[\"attachments\"][0][\"filename\"]}}",
+        "parents": [
+          "Images"
+        ],
+        "binaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "aegasln1",
+      "name": "Prepare Success Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1650,
+        200
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "filename",
+              "value": "{{$json[\"attachments\"][0][\"filename\"]}}"
+            },
+            {
+              "name": "fileType",
+              "value": "{{$json[\"attachments\"][0][\"mimeType\"]}}"
+            },
+            {
+              "name": "from",
+              "value": "{{$node[\"Gmail Trigger\"].json[\"headers\"][\"from\"]}}"
+            },
+            {
+              "name": "subject",
+              "value": "{{$node[\"Gmail Trigger\"].json[\"headers\"][\"subject\"]}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "slack1",
+      "name": "Send Success Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1850,
+        200
+      ],
+      "parameters": {
+        "operation": "post",
+        "authentication": "accessToken",
+        "channel": "#file-uploads",
+        "text": "✅ File processed successfully!\n\n📧 From: {{$json[\"headers\"][\"from\"]}}\n📋 Subject: {{$json[\"headers\"][\"subject\"]}}\n📎 File: {{$json.filename}}\n🗂️ Type: {{$json.fileType}}"
+      }
+    },
+    {
+      "id": "x9mkjiod",
+      "name": "Prepare Error Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1250,
+        400
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "message",
+              "value": "Unsupported file type"
+            },
+            {
+              "name": "filename",
+              "value": "{{$json[\"attachments\"][0][\"filename\"]}}"
+            },
+            {
+              "name": "fileType",
+              "value": "{{$json[\"attachments\"][0][\"mimeType\"]}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "slack2",
+      "name": "Send Error Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1450,
+        400
+      ],
+      "parameters": {
+        "operation": "post",
+        "authentication": "accessToken",
+        "channel": "#file-uploads",
+        "text": "⚠️ Unsupported file type!\n\n📎 File: {{$json.filename}}\n🗂️ Type: {{$json.fileType}}\n\nOnly PDFs and images (JPEG, PNG, GIF) are supported."
+      }
+    },
+    {
+      "id": "6w5sdmn3",
+      "name": "No Attachments Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        650,
+        400
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "no_attachments"
+            },
+            {
+              "name": "from",
+              "value": "{{$json[\"headers\"][\"from\"]}}"
+            },
+            {
+              "name": "subject",
+              "value": "{{$json[\"headers\"][\"subject\"]}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "error1",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        600
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "slack3",
+      "name": "Send Error Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        450,
+        600
+      ],
+      "parameters": {
+        "operation": "post",
+        "authentication": "accessToken",
+        "channel": "#errors",
+        "text": "🚨 Workflow Error!\n\nWorkflow: Gmail Attachment Processor\nError: {{$json[\"error\"][\"message\"]}}\nNode: {{$json[\"error\"][\"node\"][\"name\"]}}"
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Attachments Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Attachments": {
+      "main": [
+        [
+          {
+            "node": "Download Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Attachment": {
+      "main": [
+        [
+          {
+            "node": "Check File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check File Type": {
+      "main": [
+        [
+          {
+            "node": "Save PDF to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resize Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resize Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resize Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Error Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save PDF to Drive": {
+      "main": [
+        [
+          {
+            "node": "Prepare Success Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resize Image": {
+      "main": [
+        [
+          {
+            "node": "Save Image to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Image to Drive": {
+      "main": [
+        [
+          {
+            "node": "Prepare Success Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Success Data": {
+      "main": [
+        [
+          {
+            "node": "Send Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Success Notification": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Error Data": {
+      "main": [
+        [
+          {
+            "node": "Send Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Error Notification": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Send Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": false,
+    "saveManualExecutions": true,
+    "executionTimeout": -1,
+    "timezone": "America/New_York"
+  }
+}
+Workflow validated successfully!
+✅ Workflow validated and fixed after 1 attempts
+Cleanup completed
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["attachments"].length}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+  * Gmail node Download Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+  * Slack node Send Success Notification: no otherOptions field found (good)
+  * Slack node Send Error Notification: no otherOptions field found (good)
+  * Slack node Send Error Alert: no otherOptions field found (good)
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["attachments"].length}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+    * Send Success Notification: has otherOptions = false
+    * Send Error Notification: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+    * Download Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+    * Send Success Notification: has otherOptions = false
+    * Send Error Notification: has otherOptions = false
+    * Send Error Alert: has otherOptions = false
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+    * Download Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail OAuth2"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail Attachment Processor with Slack Notifications",
+  "nodes": [
+    {
+      "id": "gmail1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersi...
+Analytics tracking not available - trackGeneration method missing
+ POST /api/generate/v2 200 in 74572ms
+ POST /api/generate/v2 200 in 4783ms
+ POST /api/generate/v2 400 in 13ms
+Analytics tracking not available - trackGeneration method missing
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Get Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+🔧 Applying n8n format fixes...
+🔍 Google Drive nodes BEFORE formatFixer:
+  - Upload to Drive: parents = ["root"]
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+  ✅ Fixed IF node: empty rightValue → 0 for largerThan
+🔧 Processing Google Drive node: Upload to Drive
+Fixed mixed expression syntax in Set node value: filename
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Has Attachments? (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"attachments\"].length}}",
+        "rightValue": 0,
+        "operation": "largerThan"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Get Attachment (n8n-nodes-base.gmail)
+Parameters: {
+  "resource": "messageAttachment",
+  "operation": "get",
+  "messageId": "={{$node[\"Gmail Trigger\"].json[\"id\"]}}",
+  "attachmentId": "={{$json.id}}"
+}
+
+Node 3: Upload to Drive (n8n-nodes-base.googleDrive)
+Parameters: {
+  "operation": "upload",
+  "name": "={{$json.filename}}",
+  "parents": [
+    "root"
+  ],
+  "binaryPropertyName": "data"
+}
+
+Node 4: Set Success (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "success"
+      },
+      {
+        "name": "filename",
+        "value": "{{$node[\"Get Attachment\"].json[\"filename\"]}}"
+      },
+      {
+        "name": "message",
+        "value": "Attachment saved to Google Drive"
+      }
+    ]
+  }
+}
+
+Node 5: Set No Attachments (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "skipped"
+      },
+      {
+        "name": "message",
+        "value": "No attachments found in email"
+      }
+    ]
+  }
+}
+
+Node 6: Set Error (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "error"
+      },
+      {
+        "name": "message",
+        "value": "Failed to process attachment"
+      }
+    ]
+  }
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Has Attachments?",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Has Attachments?": {
+    "main": [
+      [
+        {
+          "node": "Get Attachment",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Set No Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Get Attachment": {
+    "main": [
+      [
+        {
+          "node": "Upload to Drive",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Upload to Drive": {
+    "main": [
+      [
+        {
+          "node": "Set Success",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "errorWorkflow": "none",
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "saveExecutionProgress": true,
+  "saveManualExecutions": true,
+  "callerPolicy": "workflowsFromSameOwner",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+🔍 Google Drive nodes AFTER formatFixer:
+  - Upload to Drive: parents = ["root"]
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Get Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔍 Starting n8n validation and auto-fix loop...
+🧹 Strict cleaning complete. Removed any non-standard fields.
+🧹 Created strictly cleaned workflow for n8n validation
+🔍 Workflow being sent to n8n validation:
+📋 Top-level fields: [ 'name', 'nodes', 'connections', 'settings' ]
+📋 Node count: 7
+🔍 Google Drive node Upload to Drive parents structure: ["root"]
+Starting n8n validation loop...
+
+🔍 Google Drive nodes at Initial validation:
+  - Upload to Drive:
+    parents: ["root"]
+    operation: upload
+Validation attempt 1/3
+🔍 Sending to n8n API: {
+  "name": "Test_1749227317879",
+  "nodes": [
+    {
+      "id": "gmail1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "labelIds": [
+          "INBOX"
+        ],
+        "includeAttachments": true
+      }
+    },
+    {
+      "id": "4di0nora",
+      "name": "Has Attachments?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"attachments\"].length}}",
+              "rightValue": 0,
+              "operation": "largerThan"
+            }
+          ]
+        },
+        "combineOperation": "all"
+      }
+    },
+    {
+      "id": "gmail2",
+      "name": "Get Attachment",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        650,
+        200
+      ],
+      "parameters": {
+        "resource": "messageAttachment",
+        "operation": "get",
+        "messageId": "={{$node[\"Gmail Trigger\"].json[\"id\"]}}",
+        "attachmentId": "={{$json.id}}"
+      }
+    },
+    {
+      "id": "gdrive1",
+      "name": "Upload to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        850,
+        200
+      ],
+      "parameters": {
+        "operation": "upload",
+        "name": "={{$json.filename}}",
+        "parents": [
+          "root"
+        ],
+        "binaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "1x82cta5",
+      "name": "Set Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        200
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "filename",
+              "value": "{{$node[\"Get Attachment\"].json[\"filename\"]}}"
+            },
+            {
+              "name": "message",
+              "value": "Attachment saved to Google Drive"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c1edxxw8",
+      "name": "Set No Attachments",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        650,
+        400
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "skipped"
+            },
+            {
+              "name": "message",
+              "value": "No attachments found in email"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "3grzknc4",
+      "name": "Set Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        850,
+        350
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "message",
+              "value": "Failed to process attachment"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Has Attachments?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Attachments?": {
+      "main": [
+        [
+          {
+            "node": "Get Attachment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set No Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Attachment": {
+      "main": [
+        [
+          {
+            "node": "Upload to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Drive": {
+      "main": [
+        [
+          {
+            "node": "Set Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "executionTimeout": -1,
+    "timezone": "America/New_York"
+  }
+}
+Workflow validated successfully!
+✅ Workflow validated and fixed after 1 attempts
+Cleanup completed
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["attachments"].length}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  * Gmail node Get Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["attachments"].length}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Get Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Get Attachment: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Save Gmail Attachments to Google Drive",
+  "nodes": [
+    {
+      "id": "gmail1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+     ...
+Analytics tracking not available - trackGeneration method missing
+ POST /api/generate/v2 200 in 47121ms
+ ✓ Compiled in 780ms (443 modules)
+ ✓ Compiled in 241ms (443 modules)
+ ✓ Compiled in 274ms (443 modules)
+ ✓ Compiled in 378ms (443 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/2.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/2.pack.gz'
+ ✓ Compiled in 252ms (443 modules)
+ ⨯ ./src/lib/monitoring/analytics.js
+Error:   [31mx[0m Expected a semicolon
+    ,-[[36;1;4m/Users/dominickhill/ai-automation/src/lib/monitoring/analytics.js[0m:56:1]
+ [2m53[0m |     });
+ [2m54[0m |   }
+ [2m55[0m | 
+ [2m56[0m |   async trackN8nValidation(params) {
+    : [35;1m  ^[0m
+ [2m57[0m |     const {
+ [2m58[0m |       workflowId,
+ [2m59[0m |       success,
+    `----
+  [31mx[0m Expected '=>', got '('
+    ,-[[36;1;4m/Users/dominickhill/ai-automation/src/lib/monitoring/analytics.js[0m:56:1]
+ [2m53[0m |     });
+ [2m54[0m |   }
+ [2m55[0m | 
+ [2m56[0m |   async trackN8nValidation(params) {
+    : [35;1m                          ^[0m
+ [2m57[0m |     const {
+ [2m58[0m |       workflowId,
+ [2m59[0m |       success,
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/lib/monitoring/analytics.js
+ ✓ Compiled in 266ms (443 modules)
+ ⨯ ./src/lib/monitoring/analytics.js
+Error:   [31mx[0m Expected a semicolon
+    ,-[[36;1;4m/Users/dominickhill/ai-automation/src/lib/monitoring/analytics.js[0m:90:1]
+ [2m87[0m |     });
+ [2m88[0m |   }
+ [2m89[0m | 
+ [2m90[0m |   async trackRAGUsage(params) {
+    : [35;1m  ^[0m
+ [2m91[0m |     const {
+ [2m92[0m |       queryId,
+ [2m93[0m |       platform,
+    `----
+  [31mx[0m Expected '=>', got '('
+    ,-[[36;1;4m/Users/dominickhill/ai-automation/src/lib/monitoring/analytics.js[0m:90:1]
+ [2m87[0m |     });
+ [2m88[0m |   }
+ [2m89[0m | 
+ [2m90[0m |   async trackRAGUsage(params) {
+    : [35;1m                     ^[0m
+ [2m91[0m |     const {
+ [2m92[0m |       queryId,
+ [2m93[0m |       platform,
+    `----
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./src/lib/monitoring/analytics.js
+ ✓ Compiled in 330ms (443 modules)
+ ✓ Compiled in 294ms (443 modules)
+ ✓ Compiled in 275ms (443 modules)
+ ✓ Compiled /api/generate/v2 in 441ms (1055 modules)
+✅ Analytics module initialized successfully
+📊 BEFORE formatFixer - Initial state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Download PDF: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags
+🔧 Applying n8n format fixes...
+🔍 Google Drive nodes BEFORE formatFixer:
+  - Upload to Drive: parents = ["root"]
+🔧 formatFixer.fixN8nWorkflow called!
+🔧 Running expression syntax fix...
+🔧 Fixing Gmail field references...
+  ✅ Gmail trigger found, applying field reference fixes
+  ✅ Fixed IF node: empty rightValue → 0 for largerThan
+🔧 Processing Google Drive node: Upload to Drive
+Fixed mixed expression syntax in Set node value: emailId
+Fixed mixed expression syntax in Set node value: filename
+🔧 Ensuring Slack nodes don't have otherOptions field
+🔍 Detailed workflow structure:
+
+Node 0: Gmail Trigger (n8n-nodes-base.gmailTrigger)
+Parameters: {
+  "labelIds": [
+    "INBOX"
+  ],
+  "includeAttachments": true
+}
+
+Node 1: Has PDF Attachments (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"attachments\"].length}}",
+        "rightValue": 0,
+        "operation": "largerThan"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 2: Split Attachments (n8n-nodes-base.splitInBatches)
+Parameters: {
+  "batchSize": 1
+}
+
+Node 3: Is PDF (n8n-nodes-base.if)
+Parameters: {
+  "conditions": {
+    "conditions": [
+      {
+        "leftValue": "={{$json[\"attachments\"][0][\"mimeType\"]}}",
+        "rightValue": "application/pdf",
+        "operation": "contains"
+      }
+    ]
+  },
+  "combineOperation": "all"
+}
+
+Node 4: Download PDF (n8n-nodes-base.gmail)
+Parameters: {
+  "resource": "messageAttachment",
+  "operation": "get",
+  "messageId": "={{$node[\"Gmail Trigger\"].json[\"id\"]}}",
+  "attachmentId": "={{$json[\"attachments\"][0][\"id\"]}}"
+}
+
+Node 5: Upload to Drive (n8n-nodes-base.googleDrive)
+Parameters: {
+  "operation": "upload",
+  "name": "={{$json[\"attachments\"][0][\"filename\"]}}",
+  "parents": [
+    "root"
+  ],
+  "binaryPropertyName": "data"
+}
+
+Node 6: Log Error (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "error",
+        "value": "Failed to process attachment"
+      },
+      {
+        "name": "emailId",
+        "value": "{{$node[\"Gmail Trigger\"].json[\"id\"]}}"
+      }
+    ]
+  }
+}
+
+Node 7: Success (n8n-nodes-base.set)
+Parameters: {
+  "values": {
+    "string": [
+      {
+        "name": "status",
+        "value": "success"
+      },
+      {
+        "name": "filename",
+        "value": "{{$json[\"attachments\"][0][\"filename\"]}}"
+      }
+    ]
+  }
+}
+
+Connections: {
+  "Gmail Trigger": {
+    "main": [
+      [
+        {
+          "node": "Has PDF Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Has PDF Attachments": {
+    "main": [
+      [
+        {
+          "node": "Split Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      []
+    ]
+  },
+  "Split Attachments": {
+    "main": [
+      [
+        {
+          "node": "Is PDF",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Is PDF": {
+    "main": [
+      [
+        {
+          "node": "Download PDF",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "Split Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Download PDF": {
+    "main": [
+      [
+        {
+          "node": "Upload to Drive",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Upload to Drive": {
+    "main": [
+      [
+        {
+          "node": "Success",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "Success": {
+    "main": [
+      [
+        {
+          "node": "Split Attachments",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
+
+Settings: {
+  "executionOrder": "v1",
+  "saveExecutionProgress": false,
+  "saveManualExecutions": true,
+  "saveDataErrorExecution": "all",
+  "saveDataSuccessExecution": "all",
+  "executionTimeout": -1,
+  "timezone": "America/New_York"
+}
+🔧 Fixing attachment field references...
+  ✅ Fixed attachment reference in Is PDF: ={{$json["attachments"][0]["mimeType"]}} → ={{$json["mimeType"]}}
+  ✅ Fixed attachment reference in Download PDF: ={{$json["attachments"][0]["id"]}} → ={{$json["id"]}}
+  ✅ Fixed attachment reference in Upload to Drive: ={{$json["attachments"][0]["filename"]}} → ={{$json["filename"]}}
+  ✅ Fixed attachment reference in Success: {{$json["attachments"][0]["filename"]}} → {{$json["filename"]}}
+✅ formatFixer.fixN8nWorkflow completed!
+✅ Format fixes applied
+🔍 Google Drive nodes AFTER formatFixer:
+  - Upload to Drive: parents = ["root"]
+📊 AFTER formatFixer - Fixed state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Download PDF: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, meta, versionId, pinData, staticData, tags, active
+🔍 Starting n8n validation and auto-fix loop...
+🧹 Strict cleaning complete. Removed any non-standard fields.
+🧹 Created strictly cleaned workflow for n8n validation
+🔍 Workflow being sent to n8n validation:
+📋 Top-level fields: [ 'name', 'nodes', 'connections', 'settings' ]
+📋 Node count: 8
+🔍 Google Drive node Upload to Drive parents structure: ["root"]
+Starting n8n validation loop...
+
+🔍 Google Drive nodes at Initial validation:
+  - Upload to Drive:
+    parents: ["root"]
+    operation: upload
+Validation attempt 1/3
+🔍 Sending to n8n API: {
+  "name": "Test_1749227797244",
+  "nodes": [
+    {
+      "id": "trigger1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ],
+      "parameters": {
+        "labelIds": [
+          "INBOX"
+        ],
+        "includeAttachments": true
+      }
+    },
+    {
+      "id": "filter1",
+      "name": "Has PDF Attachments",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"attachments\"].length}}",
+              "rightValue": 0,
+              "operation": "largerThan"
+            }
+          ]
+        },
+        "combineOperation": "all"
+      }
+    },
+    {
+      "id": "split1",
+      "name": "Split Attachments",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        650,
+        200
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "id": "checkpdf",
+      "name": "Is PDF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        200
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"mimeType\"]}}",
+              "rightValue": "application/pdf",
+              "operation": "contains"
+            }
+          ]
+        },
+        "combineOperation": "all"
+      }
+    },
+    {
+      "id": "getatt1",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        100
+      ],
+      "parameters": {
+        "resource": "messageAttachment",
+        "operation": "get",
+        "messageId": "={{$node[\"Gmail Trigger\"].json[\"id\"]}}",
+        "attachmentId": "={{$json[\"id\"]}}"
+      }
+    },
+    {
+      "id": "upload1",
+      "name": "Upload to Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1250,
+        100
+      ],
+      "parameters": {
+        "operation": "upload",
+        "name": "={{$json[\"filename\"]}}",
+        "parents": [
+          "root"
+        ],
+        "binaryPropertyName": "data"
+      }
+    },
+    {
+      "id": "error1",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1050,
+        400
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "error",
+              "value": "Failed to process attachment"
+            },
+            {
+              "name": "emailId",
+              "value": "{{$node[\"Gmail Trigger\"].json[\"id\"]}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "success1",
+      "name": "Success",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        100
+      ],
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "filename",
+              "value": "{{$json[\"filename\"]}}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Has PDF Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has PDF Attachments": {
+      "main": [
+        [
+          {
+            "node": "Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Split Attachments": {
+      "main": [
+        [
+          {
+            "node": "Is PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is PDF": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Upload to Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Drive": {
+      "main": [
+        [
+          {
+            "node": "Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success": {
+      "main": [
+        [
+          {
+            "node": "Split Attachments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveExecutionProgress": false,
+    "saveManualExecutions": true,
+    "executionTimeout": -1,
+    "timezone": "America/New_York"
+  }
+}
+Workflow validated successfully!
+✅ Workflow validated and fixed after 1 attempts
+Cleanup completed
+🔍 Sample expression check BEFORE cleaning:
+IF node leftValue: ={{$json["attachments"].length}}
+🧹 Starting cleanWorkflowForExport for n8n workflow
+🔍 cleanWorkflowForExport - nodes check:
+  * Gmail node Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  * Gmail node Download PDF: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+🔍 After cleanWorkflowForExport processing:
+  - Has versionId: true
+  - Has pinData: true
+  - Has staticData: true
+  - Has tags: true
+  - Has active: true
+🔍 After cleaning - expression check:
+IF node leftValue: ={{$json["attachments"].length}}
+📊 AFTER cleaning - Sanitized state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Download PDF: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔧 Creating final importReadyWorkflow for client
+🔧 Final fixup: Checking for issues in nodes
+📊 FINAL WORKFLOW - Import-ready state:
+  - Slack nodes check:
+  - Gmail nodes check:
+    * Gmail Trigger: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+    * Download PDF: credentials = {"gmailOAuth2":{"id":"1","name":"Gmail account"}}
+  - Top-level workflow fields: name, nodes, connections, settings, versionId, pinData, staticData, tags, active, meta
+🔄 FINAL WORKFLOW (first 200 chars): {
+  "name": "Gmail PDF to Google Drive",
+  "nodes": [
+    {
+      "id": "trigger1",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position"...
+❌ Analytics tracking failed: TypeError: this.hashInput is not a function
+    at WorkflowAnalytics.summarizeInput (src/lib/monitoring/analytics.js:228:17)
+    at WorkflowAnalytics.trackGeneration (src/lib/monitoring/analytics.js:41:26)
+    at POST (src/app/api/generate/v2/route.js:805:24)
+  226 |       wordCount: words.length,
+  227 |       keywords: this.extractKeywords(input),
+> 228 |       hash: this.hashInput(input),
+      |                 ^
+  229 |     };
+  230 |   }
+  231 |
+ POST /api/generate/v2 200 in 42057ms
+ ✓ Compiled in 1126ms (442 modules)
+ ✓ Compiled in 480ms (442 modules)
+ ✓ Compiled in 237ms (442 modules)
+ ✓ Compiled in 288ms (442 modules)
+ ✓ Compiled in 405ms (442 modules)
+ ✓ Compiled in 184ms (442 modules)
+ ✓ Compiled in 174ms (442 modules)
+ ✓ Compiled in 1502ms (442 modules)
+ ✓ Compiled in 298ms (442 modules)
+ ✓ Compiled in 221ms (442 modules)
+ ✓ Compiled in 232ms (442 modules)
+ ✓ Compiled in 388ms (442 modules)
+ ✓ Compiled in 291ms (442 modules)
+ ✓ Compiled in 320ms (442 modules)
+ ✓ Compiled in 252ms (442 modules)
+ ✓ Compiled in 213ms (442 modules)
+ ✓ Compiled in 279ms (442 modules)
+ ✓ Compiled in 254ms (442 modules)
+ ✓ Compiled in 381ms (442 modules)
+ ✓ Compiled in 167ms (442 modules)
+ ✓ Compiled in 1019ms (442 modules)
+ ✓ Compiled in 253ms (442 modules)
+ ✓ Compiled in 195ms (442 modules)
+ ✓ Compiled in 828ms (442 modules)
+ ✓ Compiled in 263ms (442 modules)
+ ✓ Compiled in 1085ms (442 modules)
+ ✓ Compiled in 244ms (442 modules)
+ ✓ Compiled in 179ms (442 modules)
+ ✓ Compiled in 222ms (442 modules)
+ ✓ Compiled in 255ms (442 modules)
+ ✓ Compiled in 309ms (442 modules)
+ ✓ Compiled in 957ms (442 modules)
+ ✓ Compiled in 604ms (442 modules)
+ ✓ Compiled in 355ms (442 modules)
+ ✓ Compiled in 276ms (442 modules)
+ ✓ Compiled in 221ms (442 modules)
+ ✓ Compiled in 1311ms (442 modules)
+ ✓ Compiled in 231ms (442 modules)
+ ✓ Compiled in 225ms (442 modules)
+ ✓ Compiled in 320ms (442 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 291ms (442 modules)
+ ✓ Compiled in 656ms (442 modules)
+ ✓ Compiled in 315ms (442 modules)
+ ✓ Compiled in 257ms (442 modules)
+ ✓ Compiled in 323ms (442 modules)
+ ✓ Compiled in 188ms (442 modules)
+ ✓ Compiled in 222ms (442 modules)
+ ✓ Compiled in 167ms (442 modules)
+ ✓ Compiled in 161ms (442 modules)
+ ✓ Compiled in 107ms (442 modules)
+ ✓ Compiled in 258ms (442 modules)
+ ✓ Compiled in 213ms (442 modules)
+ ✓ Compiled in 211ms (442 modules)
+ ✓ Compiled in 198ms (442 modules)
+ ✓ Compiled in 241ms (442 modules)
+ ✓ Compiled in 217ms (442 modules)
+ ✓ Compiled in 218ms (442 modules)
+ ✓ Compiled in 186ms (442 modules)
+ ✓ Compiled in 1737ms (442 modules)
+ ✓ Compiled in 298ms (442 modules)
+ ✓ Compiled in 1597ms (442 modules)
+ ✓ Compiled in 1166ms (676 modules)
+ ✓ Compiled in 639ms (442 modules)
+ ✓ Compiled in 807ms (442 modules)
+ ✓ Compiled in 1044ms (442 modules)
+ ✓ Compiled in 310ms (442 modules)
+ ✓ Compiled in 387ms (442 modules)
+ ✓ Compiled in 429ms (442 modules)
+ ✓ Compiled in 217ms (442 modules)
+ ✓ Compiled in 286ms (442 modules)
+ ✓ Compiled in 239ms (442 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/6.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/6.pack.gz'
+ ✓ Compiled in 230ms (442 modules)
+ ✓ Compiled in 609ms (442 modules)
+ ✓ Compiled in 1365ms (442 modules)
+ ✓ Compiled in 613ms (442 modules)
+ ✓ Compiled in 270ms (442 modules)
+ ✓ Compiled in 314ms (442 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/1.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/1.pack.gz'
+ ✓ Compiled in 141ms (442 modules)
+ ✓ Compiled in 1110ms (444 modules)
+ ✓ Compiled in 524ms (449 modules)
+ ✓ Compiled in 310ms (449 modules)
+ ✓ Compiled in 2.3s (449 modules)
+ ✓ Compiled in 751ms (449 modules)
+ ✓ Compiled in 228ms (449 modules)
+<w> [webpack.cache.PackFileCacheStrategy] Caching failed for pack: Error: ENOENT: no such file or directory, rename '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz_' -> '/Users/dominickhill/ai-automation/.next/cache/webpack/client-development/0.pack.gz'
+ ✓ Compiled in 488ms (449 modules)
+ ✓ Compiled in 293ms (449 modules)
+ ✓ Compiled in 612ms (449 modules)
+ ✓ Compiled in 617ms (449 modules)
+ ✓ Compiled in 827ms (449 modules)
+ ✓ Compiled in 908ms (449 modules)
+ ✓ Compiled in 289ms (449 modules)
+ ✓ Compiled in 603ms (449 modules)
+ ✓ Compiled in 550ms (449 modules)
+ ✓ Compiled in 325ms (449 modules)
+ ✓ Compiled in 307ms (449 modules)
+ ✓ Compiled in 1102ms (449 modules)
+ ✓ Compiled in 840ms (449 modules)
+ ✓ Compiled in 367ms (449 modules)
+ ✓ Compiled in 282ms (449 modules)
+ ✓ Compiled in 563ms (449 modules)
+ ✓ Compiled in 348ms (449 modules)
+ ✓ Compiled in 551ms (449 modules)
+ ✓ Compiled in 464ms (449 modules)
+ ✓ Compiled in 404ms (449 modules)
+ ✓ Compiled in 340ms (449 modules)
+ ✓ Compiled in 1172ms (449 modules)
+ ✓ Compiled in 1083ms (683 modules)
+ ✓ Compiled in 1287ms (683 modules)
+ ✓ Compiled in 348ms (449 modules)
+ ✓ Compiled in 386ms (683 modules)
+ ✓ Compiled in 255ms (449 modules)
+ ✓ Compiled in 146ms (449 modules)
+ ✓ Compiled in 3.2s (683 modules)
+ ✓ Compiled in 1960ms (449 modules)
+ ✓ Compiled in 343ms (449 modules)
+ ✓ Compiled in 1250ms (449 modules)
+ ✓ Compiled in 915ms (449 modules)
+ ✓ Compiled in 541ms (449 modules)
+ ✓ Compiled in 373ms (449 modules)
+ ✓ Compiled in 564ms (449 modules)
+ ✓ Compiled in 424ms (449 modules)
+ ✓ Compiled in 218ms (449 modules)
+ ✓ Compiled in 275ms (449 modules)
+ ✓ Compiled in 604ms (449 modules)
+ ✓ Compiled in 298ms (449 modules)
+ ✓ Compiled in 363ms (449 modules)
+ ✓ Compiled in 270ms (449 modules)
+ ✓ Compiled in 338ms (449 modules)
+ ✓ Compiled in 609ms (449 modules)
+ ✓ Compiled in 230ms (449 modules)

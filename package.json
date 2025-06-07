@@ -4,7 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev 2>&1 | tee dev.log",
+    "dev:log": "next dev 2>&1 | tee -a dev.log",
+    "dev:clean": "rm -f dev.log && npm run dev",
+    "logs": "tail -f dev.log",
+    "logs:clear": "echo '' > dev.log",
+    "logs:view": "cat dev.log",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

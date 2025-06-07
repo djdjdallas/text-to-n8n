@@ -4,8 +4,14 @@
  * that ensure Claude returns complete workflow JSON structures
  */
 
+import { PromptValidator } from './promptValidator.js';
+import { NodeMapper } from './nodeMapper.js';
+import { workflowTemplates } from '../templates/workflowTemplates.js';
+
 export class PromptEnhancer {
   constructor() {
+    this.validator = new PromptValidator();
+    this.nodeMapper = new NodeMapper();
     // Common workflow patterns by trigger type
     this.workflowPatterns = {
       gmail: {
@@ -64,32 +70,79 @@ export class PromptEnhancer {
       ragContext = []
     } = options;
 
+    // Get node suggestions first
+    const nodeSuggestions = this.nodeMapper.analyzePrompt(userInput);
+    
+    // First validate the prompt
+    const validation = this.validator.validate(userInput);
+    
+    // Check for matching templates
+    const matchedTemplate = workflowTemplates.findMatchingTemplate(userInput);
+    
     // Parse user intent
     const intent = this.parseIntent(userInput);
     
     // Identify workflow pattern
     const pattern = this.identifyPattern(intent, userInput);
     
-    // Build enhanced prompt
-    const enhancedPrompt = this.buildEnhancedPrompt(
-      userInput,
+    let enhancedPrompt = userInput;
+    const metadata = {
+      intent,
+      pattern,
+      expectedNodes: pattern.nodes || [],
+      complexity: pattern.complexity || complexity,
+      validationRules: this.getValidationRules(pattern),
+      hasTemplate: !!matchedTemplate,
+      templateName: matchedTemplate?.name,
+      validationIssues: validation.issues.length,
+      suggestedNodes: nodeSuggestions.nodes.length,
+      enhanced: false
+    };
+
+    // If validation found issues, use the enhanced version
+    if (!validation.valid || validation.warnings.length > 0) {
+      enhancedPrompt = validation.enhancedPrompt;
+      metadata.enhanced = true;
+      metadata.enhancements = validation.suggestions;
+    }
+
+    // Apply node mapping enhancements
+    if (nodeSuggestions.nodes.length > 0) {
+      enhancedPrompt = this.nodeMapper.enhancePromptWithNodes(
+        enhancedPrompt,
+        nodeSuggestions
+      );
+      metadata.enhanced = true;
+      metadata.nodeSuggestions = nodeSuggestions;
+    }
+
+    // Add specific examples for detected patterns
+    const examples = this.getExamplesForNodes(nodeSuggestions.nodes);
+    if (examples.length > 0) {
+      enhancedPrompt += '\n\n## Examples for detected operations:';
+      examples.forEach(example => {
+        enhancedPrompt += `\n${example}`;
+      });
+    }
+
+    // Build enhanced prompt with template awareness
+    enhancedPrompt = this.buildEnhancedPrompt(
+      enhancedPrompt,
       intent,
       pattern,
       platform,
       complexity,
-      ragContext
+      ragContext,
+      matchedTemplate
     );
 
     return {
       original: userInput,
       enhanced: enhancedPrompt,
-      metadata: {
-        intent,
-        pattern,
-        expectedNodes: pattern.nodes || [],
-        complexity: pattern.complexity || complexity,
-        validationRules: this.getValidationRules(pattern)
-      }
+      metadata,
+      validation,
+      template: matchedTemplate,
+      nodeSuggestions
     };
   }
 
@@ -163,9 +216,17 @@ export class PromptEnhancer {
   /**
    * Build the enhanced prompt with explicit structure requirements
    */
-  buildEnhancedPrompt(userInput, intent, pattern, platform, complexity, ragContext) {
+  buildEnhancedPrompt(userInput, intent, pattern, platform, complexity, ragContext, matchedTemplate) {
     const contextDocs = ragContext.length > 0 
       ? `\nRELEVANT DOCUMENTATION:\n${ragContext.slice(0, 3).map(doc => doc.content).join('\n\n')}\n`
+      : '';
+
+    const templateSection = matchedTemplate
+      ? `\nTEMPLATE PATTERN DETECTED: ${matchedTemplate.name}
+Use this as a reference structure:
+${JSON.stringify(matchedTemplate.template, null, 2)}
+
+IMPORTANT: Adapt this template to the specific requirements, don't just copy it.\n`
       : '';
 
     return `You are an expert ${platform} workflow automation engineer. Create a complete, production-ready workflow.
@@ -173,6 +234,15 @@ export class PromptEnhancer {
 USER REQUEST: ${userInput}
 
 ${contextDocs}
+${templateSection}
+
+CRITICAL REQUIREMENTS FOR N8N:
+- All Google Drive nodes MUST include the "__rl" resource locator structure
+- Slack channels MUST start with '#' symbol (e.g., "#general", not "general")
+- Gmail nodes must use "gmailOAuth2" for credentials, NOT "gmailOAuth2Api"
+- Schedule triggers MUST include timezone parameter
+- Use proper n8n expression syntax: {{$json["field"]}} or {{$node["NodeName"].json["field"]}}
+- Include error handling nodes for production readiness
 
 CRITICAL REQUIREMENTS:
 1. You MUST return a complete ${platform} workflow JSON structure
@@ -306,6 +376,68 @@ IMPORTANT: The user expects a COMPLETE, WORKING workflow. Do not return partial 
       mustHaveConnections: true,
       allowedComplexity: pattern.complexity || 'moderate'
     };
+  }
+
+  /**
+   * Get examples for specific node types
+   */
+  getExamplesForNodes(nodes) {
+    const examples = [];
+    
+    nodes.forEach(node => {
+      switch(node.category) {
+        case 'audio':
+          examples.push('- For ElevenLabs: Set text parameter and choose voice (rachel, adam, etc.)');
+          break;
+        case 'schedule':
+          examples.push('- For Schedule: Use cron expression (e.g., "0 9 * * 1" for Monday 9 AM) or interval settings');
+          break;
+        case 'ai':
+          examples.push('- For AI: Set prompt/message parameter and choose model (gpt-3.5-turbo, claude-3, etc.)');
+          break;
+        case 'database':
+          examples.push('- For Database: Use proper SQL syntax and set up connection credentials');
+          break;
+        case 'image':
+          examples.push('- For Image: Set input source and specify output format/dimensions');
+          break;
+        case 'pdf':
+          examples.push('- For PDF: Use binary data input for processing PDF files');
+          break;
+        case 'messaging':
+          examples.push('- For Messaging: Set recipient and message content with proper formatting');
+          break;
+        case 'crm':
+          examples.push('- For CRM: Map fields correctly and use proper object types (contact, deal, etc.)');
+          break;
+        case 'transform':
+          examples.push('- For Data Transform: Use expressions like {{$json.field}} for field mapping');
+          break;
+        case 'conditional':
+          examples.push('- For IF/Switch: Use proper comparison operations (equal, contains, largerThan)');
+          break;
+        case 'api':
+          examples.push('- For HTTP Request: Set method, URL, headers, and body parameters correctly');
+          break;
+        case 'file':
+          examples.push('- For File Operations: Set proper paths and authentication credentials');
+          break;
+        case 'ecommerce':
+          examples.push('- For E-commerce: Use correct product/order IDs and handle pagination for lists');
+          break;
+        case 'calendar':
+          examples.push('- For Calendar: Use proper date/time formats and timezone settings');
+          break;
+        case 'email':
+          examples.push('- For Email: Set SMTP/IMAP settings and use proper addressing format');
+          break;
+        case 'forms':
+          examples.push('- For Forms: Handle form responses and map fields to workflow data');
+          break;
+      }
+    });
+    
+    return examples;
   }
 
   /**

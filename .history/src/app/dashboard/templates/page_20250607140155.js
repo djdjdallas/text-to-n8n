@@ -24,16 +24,6 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "YOUR_SUPABASE_URL";
 const supabaseKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
-
-// Debug logging for development
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log('Supabase config:', {
-    url: supabaseUrl?.substring(0, 20) + '...',
-    keyExists: !!supabaseKey,
-    keyLength: supabaseKey?.length
-  });
-}
-
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const TemplatesPage = () => {
@@ -54,42 +44,14 @@ const TemplatesPage = () => {
   // Fetch templates from Supabase
   const fetchTemplates = async () => {
     try {
-      // Check if we have valid Supabase configuration
-      if (supabaseUrl === "YOUR_SUPABASE_URL" || supabaseKey === "YOUR_SUPABASE_ANON_KEY") {
-        console.warn("Supabase not configured, using demo data");
-        const demoData = [
-          {
-            id: 1,
-            template_id: "demo-1",
-            name: "Demo Email to Slack",
-            description: "Demo workflow for email to Slack notifications",
-            category: "Productivity",
-            tags: ["email", "slack", "notifications"],
-            view_count: 100,
-            is_featured: true,
-            is_active: true,
-            author: "Demo",
-            json_data: { nodes: [], connections: {} }
-          }
-        ];
-        setTemplates(demoData);
-        setFilteredTemplates(demoData);
-        setCategories(["all", "Productivity"]);
-        return;
-      }
-
       const { data, error } = await supabase
         .from("templates")
         .select("*")
         .eq("is_active", true)
         .order("view_count", { ascending: false });
 
-      if (error) {
-        console.error("Supabase error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log("Templates fetched:", data?.length || 0);
       setTemplates(data || []);
       setFilteredTemplates(data || []);
 
@@ -110,29 +72,13 @@ const TemplatesPage = () => {
   // Fetch related templates
   const fetchRelatedTemplates = async (templateId) => {
     try {
-      // Get the current template to find related ones by category or tags
-      const currentTemplate = templates.find(t => t.template_id === templateId);
-      if (!currentTemplate) {
-        setRelatedTemplates([]);
-        return;
-      }
+      const { data, error } = await supabase.rpc("get_related_templates", {
+        tid: templateId,
+        limit_count: 3,
+      });
 
-      // Find templates with similar category or tags
-      const related = templates
-        .filter(t => 
-          t.template_id !== templateId && (
-            t.category === currentTemplate.category ||
-            (t.tags && currentTemplate.tags && 
-             t.tags.some(tag => currentTemplate.tags.includes(tag)))
-          )
-        )
-        .slice(0, 3);
-
-      setRelatedTemplates(related.map(t => ({
-        ...t,
-        similarity_score: t.category === currentTemplate.category ? 
-          'same category' : 'shared tags'
-      })));
+      if (error) throw error;
+      setRelatedTemplates(data || []);
     } catch (error) {
       console.error("Error fetching related templates:", error);
       setRelatedTemplates([]);
@@ -178,56 +124,19 @@ const TemplatesPage = () => {
   const handleUseTemplate = async (templateId) => {
     setIsDownloading(true);
     try {
-      let templateData;
+      // Fetch template with view increment
+      const { data: templateData, error } = await supabase.rpc(
+        "get_template_and_increment_view",
+        { tid: templateId }
+      );
 
-      // Handle demo data or Supabase data
-      if (supabaseUrl === "YOUR_SUPABASE_URL" || supabaseKey === "YOUR_SUPABASE_ANON_KEY") {
-        // Using demo data
-        templateData = templates.find(t => t.template_id === templateId);
-        if (!templateData) {
-          throw new Error("Template not found");
-        }
-      } else {
-        // Fetch from Supabase
-        const { data, error: fetchError } = await supabase
-          .from("templates")
-          .select("*")
-          .eq("template_id", templateId)
-          .single();
-
-        if (fetchError) {
-          console.error("Error fetching template:", fetchError);
-          throw new Error("Template not found");
-        }
-
-        if (!data) {
-          throw new Error("Template not found");
-        }
-
-        templateData = data;
-
-        // Increment view count for Supabase data
-        const { error: updateError } = await supabase
-          .from("templates")
-          .update({ view_count: (templateData.view_count || 0) + 1 })
-          .eq("template_id", templateId);
-
-        if (updateError) {
-          console.warn("Could not update view count:", updateError);
-        }
+      if (error) throw error;
+      if (!templateData || templateData.length === 0) {
+        throw new Error("Template not found");
       }
 
-      console.log("Template data retrieved:", {
-        id: templateData.template_id,
-        name: templateData.name,
-        hasJsonData: !!templateData.json_data
-      });
-
-      const workflowData = templateData.json_data;
-      
-      if (!workflowData) {
-        throw new Error("Template has no workflow data");
-      }
+      const template = templateData[0];
+      const workflowData = template.json_data;
 
       // Create a blob and download
       const blob = new Blob([JSON.stringify(workflowData, null, 2)], {
@@ -236,7 +145,7 @@ const TemplatesPage = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${templateData.name
+      a.download = `${template.name
         .replace(/[^a-z0-9]/gi, "_")
         .toLowerCase()}.json`;
       document.body.appendChild(a);
@@ -254,23 +163,10 @@ const TemplatesPage = () => {
       );
 
       // Show success message
-      console.log("Template downloaded successfully:", templateData.name);
+      console.log("Template downloaded:", templateId);
     } catch (error) {
       console.error("Error downloading template:", error);
-      
-      // Provide more specific error messages
-      let errorMessage = "Failed to download template. ";
-      if (error.message === "Template not found") {
-        errorMessage += "The template could not be found.";
-      } else if (error.message === "Template has no workflow data") {
-        errorMessage += "The template appears to be corrupted.";
-      } else if (error.message.includes("fetch")) {
-        errorMessage += "Network error. Please check your connection.";
-      } else {
-        errorMessage += "Please try again later.";
-      }
-      
-      alert(errorMessage);
+      alert("Failed to download template. Please try again.");
     } finally {
       setIsDownloading(false);
     }

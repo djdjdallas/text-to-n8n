@@ -9,6 +9,7 @@ import { validateRequest } from "@/lib/validators/requestValidator";
 import { N8nValidationLoop } from "@/lib/validation/n8nValidationLoop";
 import { analytics } from "@/lib/monitoring/analytics";
 import { promptEnhancer } from "@/lib/prompts/promptEnhancer";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Validate AI workflow structure before processing
@@ -351,15 +352,15 @@ function cleanWorkflowForExport(workflow, platform = "n8n") {
 const n8nValidator = new N8nValidationLoop();
 
 export async function POST(req) {
-  console.log("🚀 [GENERATE V2] Request received");
+  logger.info("🚀 [GENERATE V2] Request received");
   
   try {
     let body;
     try {
       body = await req.json();
-      console.log("📝 [GENERATE V2] Body parsed:", body);
+      logger.info("📝 [GENERATE V2] Body parsed:", body);
     } catch (parseError) {
-      console.error("❌ [GENERATE V2] JSON parse error:", parseError);
+      logger.error("❌ [GENERATE V2] JSON parse error:", parseError);
       return NextResponse.json(
         { 
           error: "Invalid JSON in request body", 
@@ -372,8 +373,8 @@ export async function POST(req) {
     // Validate request
     const validation = validateRequest(body);
     if (!validation.valid) {
-      console.log("❌ [GENERATE V2] Validation failed:", validation.errors);
-      console.log("❌ [GENERATE V2] Request body:", body);
+      logger.error("❌ [GENERATE V2] Validation failed:", validation.errors);
+      logger.error("❌ [GENERATE V2] Request body:", body);
       return NextResponse.json(
         { 
           error: "Invalid request", 
@@ -383,7 +384,7 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-    console.log("✅ [GENERATE V2] Request validated");
+    logger.info("✅ [GENERATE V2] Request validated");
 
     const {
       input,
@@ -455,7 +456,7 @@ export async function POST(req) {
     console.log("🤖 [GENERATE V2] Calling Claude API with enhanced prompt...");
     const genStart = Date.now();
     const claudeResponse = await anthropicClient.generateWorkflow(
-      enhancedPromptData.enhanced, // Use the enhanced prompt
+      enhancedPromptData, // Pass the full enhanced prompt data object
       {
         model: "claude-opus-4-20250514", // Use the specified model
         platform,

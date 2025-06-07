@@ -1,7 +1,97 @@
 // src/lib/workflow/formatFixer.js
 import { GoogleDriveExamples } from '@/lib/examples/googleDriveExamples';
+import { logger } from '@/lib/utils/logger';
 
 export class WorkflowFormatFixer {
+  constructor() {
+    // Error patterns and their specific fixes
+    this.errorPatternFixes = {
+      "Invalid value for field 'channel'": {
+        detector: /channel.*invalid|missing.*channel/i,
+        fixer: (workflow, context) => {
+          // Find Slack nodes and fix channel format
+          workflow.nodes.forEach(node => {
+            if (node.type === 'n8n-nodes-base.slack') {
+              if (!node.parameters.channel?.startsWith('#')) {
+                node.parameters.channel = '#' + (node.parameters.channel || 'general');
+              }
+            }
+          });
+        }
+      },
+      "Missing required field '__rl'": {
+        detector: /__rl.*missing|resource locator/i,
+        fixer: (workflow, context) => {
+          // Add resource locator structure for Drive nodes
+          workflow.nodes.forEach(node => {
+            if (node.type === 'n8n-nodes-base.googleDrive') {
+              if (!node.parameters.driveId?.__rl) {
+                node.parameters.driveId = {
+                  __rl: true,
+                  mode: "list",
+                  value: "My Drive"
+                };
+              }
+              if (!node.parameters.folderId?.__rl) {
+                node.parameters.folderId = {
+                  __rl: true,
+                  mode: "list",
+                  value: "root",
+                  cachedResultName: "/ (Root folder)"
+                };
+              }
+            }
+          });
+        }
+      },
+      "Invalid expression syntax": {
+        detector: /invalid.*expression|expression.*error/i,
+        fixer: (workflow, context) => {
+          this.fixExpressionSyntax(workflow);
+        }
+      },
+      "Missing timezone": {
+        detector: /timezone.*missing|timezone.*required/i,
+        fixer: (workflow, context) => {
+          workflow.nodes.forEach(node => {
+            if (node.type === 'n8n-nodes-base.scheduleTrigger' && !node.parameters.timezone) {
+              node.parameters.timezone = 'America/Los_Angeles';
+            }
+          });
+        }
+      },
+      "Invalid credentials": {
+        detector: /credential.*invalid|gmailOAuth2Api/i,
+        fixer: (workflow, context) => {
+          workflow.nodes.forEach(node => {
+            if (node.credentials?.gmailOAuth2Api) {
+              node.credentials.gmailOAuth2 = node.credentials.gmailOAuth2Api;
+              delete node.credentials.gmailOAuth2Api;
+            }
+          });
+        }
+      }
+    };
+  }
+
+  /**
+   * Apply error pattern fixes based on validation errors
+   */
+  applyErrorPatternFixes(workflow, errorMessage) {
+    logger.info("🔧 Applying error pattern fixes for:", errorMessage);
+    let fixApplied = false;
+    
+    for (const [pattern, config] of Object.entries(this.errorPatternFixes)) {
+      if (config.detector.test(errorMessage)) {
+        logger.info(`  ✅ Matched pattern: ${pattern}`);
+        config.fixer(workflow, { errorMessage });
+        fixApplied = true;
+      }
+    }
+    
+    return fixApplied;
+  }
+
   /**
    * Remove NoOp nodes entirely
    */
@@ -363,7 +453,7 @@ export class WorkflowFormatFixer {
    * Fix n8n workflow format issues
    */
   fixN8nWorkflow(workflow) {
-    console.log("🔧 formatFixer.fixN8nWorkflow called!");
+    logger.info("🔧 formatFixer.fixN8nWorkflow called!");
     
     // Create a copy to avoid mutations
     const fixed = JSON.parse(JSON.stringify(workflow));
@@ -576,7 +666,7 @@ export class WorkflowFormatFixer {
     });
 
     // Debug logging to confirm completion
-    console.log("✅ formatFixer.fixN8nWorkflow completed!");
+    logger.info("✅ formatFixer.fixN8nWorkflow completed!");
     
     // Generate suggestions separately from the workflow
     const suggestions = this.suggestNodeReplacements(fixed);
@@ -1029,10 +1119,13 @@ export class WorkflowFormatFixer {
   fixIfNode(node) {
     if (!node.parameters) node.parameters = {};
 
+    logger.info(`🔧 Fixing IF node: ${node.name}`);
+
     // Handle various condition formats
     if (node.parameters.conditions) {
       // REMOVE the "number" field if it exists (it's invalid)
       if (node.parameters.conditions.number) {
+        console.log(`  ❌ Removing invalid "number" field from IF node conditions`);
         delete node.parameters.conditions.number;
       }
 
@@ -1065,6 +1158,8 @@ export class WorkflowFormatFixer {
         node.parameters.conditions.conditions
           .filter((condition) => condition !== null && condition !== undefined)
           .map((condition, index) => {
+            console.log(`  🔍 Processing condition ${index + 1}:`, JSON.stringify(condition, null, 2));
+            
             // Ensure condition has all required fields
             const fixedCondition = {
               leftValue: condition.leftValue || '={{$json["field"]}}',
@@ -1072,9 +1167,38 @@ export class WorkflowFormatFixer {
               operation: condition.operation || "equal",
             };
 
+            // CRITICAL: Validate and fix leftValue property references
+            if (fixedCondition.leftValue) {
+              const beforeFix = fixedCondition.leftValue;
+              fixedCondition.leftValue = this.validateAndFixExpression(
+                fixedCondition.leftValue, 
+                node.name, 
+                node.type, 
+                'conditions.leftValue',
+                {}
+              );
+              if (beforeFix !== fixedCondition.leftValue) {
+                console.log(`  ✅ Fixed IF leftValue: ${beforeFix} → ${fixedCondition.leftValue}`);
+              }
+            }
+
             // Fix empty leftValue
             if (!fixedCondition.leftValue || fixedCondition.leftValue === "") {
-              fixedCondition.leftValue = '={{$json["email"]}}';
+              fixedCondition.leftValue = '={{$json["field"]}}';
+              console.log(`  ✅ Added default leftValue for empty condition`);
+            }
+
+            // CRITICAL: Check for and fix invalid structure like having "conditions" nested inside conditions
+            if (fixedCondition.conditions) {
+              console.log(`  ❌ Found invalid nested "conditions" field, removing`);
+              delete fixedCondition.conditions;
+            }
+
+            // CRITICAL: Validate the condition structure matches n8n requirements
+            const validOperations = ['equal', 'notEqual', 'contains', 'notContains', 'startsWith', 'notStartsWith', 'endsWith', 'notEndsWith', 'regex', 'notRegex', 'larger', 'largerEqual', 'smaller', 'smallerEqual', 'exists', 'notExists', 'largerThan', 'smallerThan'];
+            if (!validOperations.includes(fixedCondition.operation)) {
+              console.log(`  ❌ Invalid operation "${fixedCondition.operation}", defaulting to "equal"`);
+              fixedCondition.operation = 'equal';
             }
             
             // Convert complex boolean expressions to simpler ones
@@ -1159,9 +1283,10 @@ export class WorkflowFormatFixer {
 
       // Ensure at least one condition exists
       if (node.parameters.conditions.conditions.length === 0) {
+        console.log(`  ⚠️ No valid conditions found, creating default condition`);
         node.parameters.conditions.conditions = [
           {
-            leftValue: '={{$json["email"]}}',
+            leftValue: '={{$json["field"]}}',
             rightValue: "",
             operation: "equal",
           },
@@ -1170,14 +1295,31 @@ export class WorkflowFormatFixer {
 
       // Remove invalid combinator field
       if (node.parameters.conditions.combinator) {
+        console.log(`  ❌ Removing invalid "combinator" field`);
         delete node.parameters.conditions.combinator;
       }
+
+      // CRITICAL: Validate final structure doesn't have invalid nested fields
+      if (node.parameters.conditions.conditions) {
+        node.parameters.conditions.conditions.forEach((condition, idx) => {
+          // Ensure only valid fields exist
+          const validFields = ['leftValue', 'rightValue', 'operation'];
+          Object.keys(condition).forEach(key => {
+            if (!validFields.includes(key)) {
+              console.log(`  ❌ Removing invalid condition field "${key}" from condition ${idx + 1}`);
+              delete condition[key];
+            }
+          });
+        });
+      }
+
     } else {
       // No conditions at all - create default
+      console.log(`  ⚠️ No conditions object found, creating default`);
       node.parameters.conditions = {
         conditions: [
           {
-            leftValue: '={{$json["email"]}}',
+            leftValue: '={{$json["field"]}}',
             rightValue: "",
             operation: "equal",
           },
@@ -1189,6 +1331,9 @@ export class WorkflowFormatFixer {
     if (!node.parameters.combineOperation) {
       node.parameters.combineOperation = "all";
     }
+
+    // FINAL VALIDATION: Log the final IF node structure
+    console.log(`  ✅ Final IF node structure for "${node.name}":`, JSON.stringify(node.parameters.conditions, null, 2));
   }
 
   /**
@@ -2118,7 +2263,7 @@ export class WorkflowFormatFixer {
   /**
    * Recursively validate expressions in an object
    */
-  validateObjectExpressions(obj, nodeName, nodeType, knownDataStructures, path = '') {
+  validateObjectExpressions(obj, nodeName, nodeType, _knownDataStructures, path = '') {
     if (!obj || typeof obj !== 'object') return;
 
     for (const key in obj) {
@@ -2127,13 +2272,13 @@ export class WorkflowFormatFixer {
       
       if (typeof value === 'string' && value.includes('{{')) {
         // This is an expression, validate it
-        const fixedExpression = this.validateAndFixExpression(value, nodeName, nodeType, currentPath, knownDataStructures);
+        const fixedExpression = this.validateAndFixExpression(value, nodeName, nodeType, currentPath, _knownDataStructures);
         if (fixedExpression !== value) {
           obj[key] = fixedExpression;
           console.log(`  ✅ Fixed expression in ${nodeName}: ${value} → ${fixedExpression}`);
         }
       } else if (typeof value === 'object') {
-        this.validateObjectExpressions(value, nodeName, nodeType, knownDataStructures, currentPath);
+        this.validateObjectExpressions(value, nodeName, nodeType, _knownDataStructures, currentPath);
       }
     }
   }
@@ -2182,6 +2327,27 @@ export class WorkflowFormatFixer {
         pattern: /\{\{\$binary\[?"?attachment"?\]?\}\}/g,
         replacement: '{{$binary.data}}',
         reason: 'Fixed binary data reference'
+      },
+      
+      // CRITICAL: Fix rating references that incorrectly use email headers
+      {
+        pattern: /\{\{\$json\["?headers"?\]\["?from"?\]\}\}/g,
+        replacement: (match) => {
+          // Check if this is in a rating context by looking at the node name or nearby content
+          if (nodeName && (nodeName.toLowerCase().includes('rating') || nodeName.toLowerCase().includes('check'))) {
+            return '{{$json["rating"]}}';
+          }
+          // If it's actually supposed to be an email check, keep it as is
+          return match;
+        },
+        reason: 'Fixed rating check using incorrect email header reference'
+      },
+      
+      // Fix generic undefined property references in IF conditions
+      {
+        pattern: /\{\{\$json\["?[^"]*option[^"]*"?\]\}\}/g,
+        replacement: '{{$json["rating"]}}',
+        reason: 'Fixed undefined property containing "option" in IF condition'
       }
     ];
 

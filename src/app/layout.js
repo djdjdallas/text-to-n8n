@@ -3,6 +3,11 @@ import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
 import AuthProvider from '@/components/AuthProvider';
 
+// Initialize logging in development
+if (process.env.NODE_ENV === 'development') {
+  import('@/lib/init-logging');
+}
+
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
