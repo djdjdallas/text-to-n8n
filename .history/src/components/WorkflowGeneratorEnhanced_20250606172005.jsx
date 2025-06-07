@@ -67,7 +67,7 @@ export function WorkflowGeneratorEnhanced() {
           variant="outline"
           onClick={generateWorkflow}
           disabled={loading || !input.trim()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border-2"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           Generate Workflow
@@ -115,7 +115,7 @@ export function WorkflowGeneratorEnhanced() {
                         JSON.stringify(result.workflow, null, 2)
                     )
                   }
-                  className="text-sm text-blue-600 hover:text-blue-700"
+                  className="text-sm text-blue-600 hover:text-blue-700 border-2"
                 >
                   Copy to Clipboard
                 </Button>

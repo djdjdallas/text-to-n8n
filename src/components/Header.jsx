@@ -1,10 +1,27 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { supabase } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 import Button from "./ui/button";
 
 const Header = () => {
+  const pathname = usePathname();
+  const router = useRouter();
+  const isDashboard = pathname?.startsWith('/dashboard');
+
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
     <header className="glass sticky top-0 z-10 w-full border-b border-border py-2 backdrop-blur-md">
       <div className="container mx-auto flex items-center justify-between px-4">
@@ -42,12 +59,12 @@ const Header = () => {
         </div>
 
         <nav className="hidden md:flex items-center space-x-6">
-          <a href="#" className="text-sm font-medium hover:text-primary">
+          <Link href="/dashboard" className="text-sm font-medium hover:text-primary">
             Dashboard
-          </a>
-          <a href="#" className="text-sm font-medium hover:text-primary">
+          </Link>
+          <Link href="/dashboard/templates" className="text-sm font-medium hover:text-primary">
             Templates
-          </a>
+          </Link>
           <a href="#" className="text-sm font-medium hover:text-primary">
             Documentation
           </a>
@@ -59,10 +76,18 @@ const Header = () => {
         <div className="flex items-center space-x-4">
           <ThemeToggle />
           <div className="hidden sm:flex space-x-2">
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-            <Button size="sm">Get Started</Button>
+            {isDashboard ? (
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                Sign Out
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm">
+                  Sign In
+                </Button>
+                <Button size="sm">Get Started</Button>
+              </>
+            )}
           </div>
           <button className="md:hidden" aria-label="Menu">
             <svg
