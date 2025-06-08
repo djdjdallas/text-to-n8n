@@ -1,5 +1,6 @@
 // src/lib/prompts/claudeTemplates.js
 import { PLATFORMS, COMPLEXITY_LEVELS } from "@/lib/constants";
+import { enhancedN8nPrompt } from "./enhancedN8nPrompt";
 
 /**
  * Claude-optimized prompt templates and generation strategies
@@ -47,7 +48,19 @@ export class ClaudePromptOptimizer {
     // Build structured prompt sections
     const sections = [];
 
-    // 0. Critical Field Restrictions (Pre-instruction)
+    // 0. Enhanced n8n-specific instructions if platform is n8n
+    if (platform === PLATFORMS.N8N) {
+      sections.push(enhancedN8nPrompt.generatePrompt(userInput, {
+        complexity,
+        relevantDocs,
+        ...options
+      }));
+      
+      // Return early with enhanced prompt for n8n
+      return sections[0];
+    }
+
+    // 0. Critical Field Restrictions (Pre-instruction) for other platforms
     sections.push(`## 🚨 CRITICAL WORKFLOW FORMAT RESTRICTION
     
 Your output MUST be a valid ${platform} workflow JSON containing ONLY these fields:

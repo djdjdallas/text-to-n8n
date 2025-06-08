@@ -1,6 +1,9 @@
 // src/lib/workflow/formatFixer.js
 import { GoogleDriveExamples } from '@/lib/examples/googleDriveExamples';
 import { logger } from '@/lib/utils/logger';
+import { conditionFixer } from './nodeFixers/conditionFixer';
+import { gmailFixer } from './nodeFixers/gmailFixer';
+import { structureValidator } from '../validation/structureValidator';
 
 export class WorkflowFormatFixer {
   constructor() {
@@ -654,7 +657,22 @@ export class WorkflowFormatFixer {
     // 13. Validate and fix expression property references
     this.validateAndFixExpressions(fixed);
 
-    // 14. FINAL STEP: Ensure required options fields for specific node types
+    // 14. Apply Gmail-specific fixes
+    const gmailFixResult = gmailFixer.fixGmailWorkflow(fixed);
+    if (gmailFixResult.fixesApplied > 0) {
+      logger.info(`🔧 Applied ${gmailFixResult.fixesApplied} Gmail-specific fixes`);
+    }
+
+    // 15. Validate workflow structure and log issues
+    const validationResult = structureValidator.validateWorkflowStructure(fixed);
+    if (!validationResult.valid) {
+      logger.warn(`⚠️ Workflow structure validation found ${validationResult.summary.totalIssues} issues`);
+      validationResult.errors.slice(0, 3).forEach(error => {
+        logger.warn(`  - ${error.type}: ${error.message}`);
+      });
+    }
+
+    // 16. FINAL STEP: Ensure required options fields for specific node types
     // This must run LAST to ensure no cleanup operations remove required fields
     this.ensureRequiredOptionsFields(fixed);
 
@@ -1182,10 +1200,29 @@ export class WorkflowFormatFixer {
               }
             }
 
-            // Fix empty leftValue
-            if (!fixedCondition.leftValue || fixedCondition.leftValue === "") {
-              fixedCondition.leftValue = '={{$json["field"]}}';
-              console.log(`  ✅ Added default leftValue for empty condition`);
+            // Fix empty leftValue with context-aware condition
+            if (!fixedCondition.leftValue || fixedCondition.leftValue === "" || fixedCondition.leftValue === '={{$json["field"]}}') {
+              // Use the new condition fixer to generate context-aware conditions
+              const previousNode = this.findPreviousNode(workflow, node);
+              const contextFix = conditionFixer.fixConditionBasedOnContext(node, previousNode, { workflowName: workflow.name });
+              
+              if (contextFix.replace) {
+                logger.warn(`  ⚠️ ${contextFix.reason} - Consider replacing with ${contextFix.nodeType} node`);
+                // For now, still create a condition but log the suggestion
+                fixedCondition.leftValue = '={{$json["subject"]}}'; // Better fallback
+                fixedCondition.rightValue = 'value';
+                fixedCondition.operation = 'contains';
+              } else if (contextFix.condition) {
+                // Use the generated condition
+                Object.assign(fixedCondition, contextFix.condition);
+                logger.info(`  ✅ Applied context-aware condition: ${fixedCondition.leftValue}`);
+              } else {
+                // Fallback to a more reasonable default
+                fixedCondition.leftValue = '={{$json["subject"]}}';
+                fixedCondition.rightValue = 'value';
+                fixedCondition.operation = 'contains';
+                logger.warn(`  ⚠️ Using fallback condition for empty leftValue`);
+              }
             }
 
             // CRITICAL: Check for and fix invalid structure like having "conditions" nested inside conditions
@@ -2417,6 +2454,31 @@ export class WorkflowFormatFixer {
     };
     
     return structures[nodeType] || {};
+  }
+
+  /**
+   * Find the previous node in the workflow chain
+   */
+  findPreviousNode(workflow, currentNode) {
+    if (!workflow.connections || !currentNode) return null;
+    
+    // Look through connections to find what connects to this node
+    for (const [sourceName, outputs] of Object.entries(workflow.connections)) {
+      if (outputs.main) {
+        for (const outputArray of outputs.main) {
+          if (Array.isArray(outputArray)) {
+            for (const connection of outputArray) {
+              if (connection.node === currentNode.name) {
+                // Found a connection to this node, find the source node
+                return workflow.nodes?.find(n => n.name === sourceName) || null;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**
