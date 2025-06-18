@@ -444,7 +444,7 @@ export async function POST(req) {
 
     // 2. Enhance the prompt for better structure
     console.log("🎯 [GENERATE V2] Enhancing prompt for better structure...");
-    const enhancedPromptData = promptEnhancer.enhance(input, {
+    const enhancedPromptData = await promptEnhancer.enhance(input, {
       platform,
       complexity,
       ragContext: relevantDocs

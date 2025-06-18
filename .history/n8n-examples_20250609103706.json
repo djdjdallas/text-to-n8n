@@ -1,0 +1,2693 @@
+
+{
+    "nodes": [
+      {
+        "id": "webhook_1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/webhook-endpoint",
+          "httpMethod": "POST",
+          "responseMode": "onReceived",
+          "responseData": "allEntries"
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+
+  {
+    "nodes": [
+      {
+        "id": "http_request_1",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/data",
+          "authentication": "none",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+  // Single Nodes: Code Node
+  {
+    "nodes": [
+      {
+        "id": "code_1",
+        "name": "Code",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Process items\nfor (const item of $input.all()) {\n  item.json.processed = true;\n  item.json.timestamp = new Date().toISOString();\n}\n\nreturn $input.all();"
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+  // Single Nodes: Set Variable
+  {
+    "nodes": [
+      {
+        "id": "set_1",
+        "name": "Set",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "duplicateItem": false,
+          "assignments": {
+            "assignments": [
+              {
+                "id": "assignment_1",
+                "name": "status",
+                "value": "processed",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+  // Single Nodes: Wait Node
+  {
+    "nodes": [
+      {
+        "id": "wait_1",
+        "name": "Wait",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "amount": 5,
+          "unit": "seconds"
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+  // Single Nodes: Switch Node
+  {
+    "nodes": [
+      {
+        "id": "switch_1",
+        "name": "Switch",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "dataType": "string",
+          "value1": "={{$json.type}}",
+          "rules": {
+            "rules": [
+              {
+                "value2": "customer",
+                "output": 0
+              },
+              {
+                "value2": "lead",
+                "output": 1
+              }
+            ]
+          },
+          "fallbackOutput": 2
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+  // Common Pairs: Webhook to Google Sheets
+  {
+    "nodes": [
+      {
+        "id": "webhook_trigger",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/form-submit",
+          "httpMethod": "POST",
+          "responseMode": "onReceived"
+        }
+      },
+      {
+        "id": "sheets_append",
+        "name": "Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "append",
+          "documentId": "SHEET_ID",
+          "sheetName": "Sheet1"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Common Pairs: Gmail to Slack
+  {
+    "nodes": [
+      {
+        "id": "gmail_trigger",
+        "name": "Gmail Trigger",
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "labelIds": [
+            "INBOX"
+          ]
+        }
+      },
+      {
+        "id": "slack_notify",
+        "name": "Slack",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "post",
+          "channel": "#general",
+          "text": "📧 New Email\n*From:* {{$json.from}}\n*Subject:* {{$json.subject}}"
+        }
+      }
+    ],
+    "connections": {
+      "Gmail Trigger": {
+        "main": [
+          [
+            {
+              "node": "Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Common Pairs: Schedule to Email
+  {
+    "nodes": [
+      {
+        "id": "schedule_trigger",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "send_email",
+        "name": "Gmail",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "send",
+          "sendTo": "recipient@example.com",
+          "subject": "Daily Report",
+          "message": "Good morning! Here's your daily update."
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Gmail",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Common Pairs: API to Database
+  {
+    "nodes": [
+      {
+        "id": "http_api",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/users",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth"
+        }
+      },
+      {
+        "id": "postgres_insert",
+        "name": "Postgres",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "insert",
+          "table": "users",
+          "columns": "id,name,email",
+          "returnFields": "*"
+        }
+      }
+    ],
+    "connections": {
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Postgres",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Common Pairs: RSS to Discord
+  {
+    "nodes": [
+      {
+        "id": "rss_trigger",
+        "name": "RSS Feed Trigger",
+        "type": "n8n-nodes-base.rssFeedReadTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "feedUrl": "https://example.com/rss",
+          "pollInterval": 60
+        }
+      },
+      {
+        "id": "discord_post",
+        "name": "Discord",
+        "type": "n8n-nodes-base.discord",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "webhook": "https://discord.com/api/webhooks/YOUR_WEBHOOK",
+          "content": "**New Post:** {{$json.title}}\n{{$json.link}}"
+        }
+      }
+    ],
+    "connections": {
+      "RSS Feed Trigger": {
+        "main": [
+          [
+            {
+              "node": "Discord",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // AI Patterns: ChatGPT Text Processing
+  {
+    "nodes": [
+      {
+        "id": "manual_1",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "openai_chat",
+        "name": "OpenAI",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "resource": "chat",
+          "model": "gpt-3.5-turbo",
+          "messages": {
+            "values": [
+              {
+                "role": "user",
+                "content": "={{$json.text}}"
+              }
+            ]
+          },
+          "options": {
+            "temperature": 0.7
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "OpenAI",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // AI Patterns: AI Content Moderation
+  {
+    "nodes": [
+      {
+        "id": "webhook_content",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/moderate-content",
+          "httpMethod": "POST"
+        }
+      },
+      {
+        "id": "ai_moderate",
+        "name": "OpenAI Moderate",
+        "type": "@n8n/n8n-nodes-langchain.openAi",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "resource": "chat",
+          "model": "gpt-3.5-turbo",
+          "messages": {
+            "values": [
+              {
+                "role": "system",
+                "content": "You are a content moderator. Analyze if content is appropriate. Respond with JSON: {\"appropriate\": true/false, \"reason\": \"explanation\"}"
+              },
+              {
+                "role": "user",
+                "content": "={{$json.content}}"
+              }
+            ]
+          },
+          "options": {
+            "temperature": 0.1,
+            "responseFormat": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      {
+        "id": "parse_json",
+        "name": "Parse JSON",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const response = JSON.parse($json.message.content);\nreturn [{\n  json: {\n    ...response,\n    originalContent: $input.first().json.content\n  }\n}];"
+        }
+      },
+      {
+        "id": "check_appropriate",
+        "name": "IF Appropriate",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{$json.appropriate}}",
+                "value2": true
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "OpenAI Moderate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "OpenAI Moderate": {
+        "main": [
+          [
+            {
+              "node": "Parse JSON",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse JSON": {
+        "main": [
+          [
+            {
+              "node": "IF Appropriate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Complex Patterns: Error Handling Pattern
+  {
+    "nodes": [
+      {
+        "id": "start_1",
+        "name": "Start",
+        "type": "n8n-nodes-base.start",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "process_data",
+        "name": "Process Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Simulate processing that might fail\nif (Math.random() > 0.5) {\n  throw new Error('Processing failed');\n}\nreturn [{json: {status: 'success'}}];"
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "check_error",
+        "name": "IF Error",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{$node[\"Process Data\"].error}}",
+                "value2": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "error_notification",
+        "name": "Send Error Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          850,
+          200
+        ],
+        "parameters": {
+          "fromEmail": "n8n@example.com",
+          "toEmail": "admin@example.com",
+          "subject": "Workflow Error",
+          "text": "Error: {{$node[\"Process Data\"].error.message}}"
+        }
+      },
+      {
+        "id": "success_continue",
+        "name": "Continue Processing",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          850,
+          400
+        ]
+      }
+    ],
+    "connections": {
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "Process Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Process Data": {
+        "main": [
+          [
+            {
+              "node": "IF Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Error": {
+        "main": [
+          [
+            {
+              "node": "Send Error Email",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Continue Processing",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Complex Patterns: Data Processing Pipeline
+  {
+    "nodes": [
+      {
+        "id": "read_file",
+        "name": "Read Binary Files",
+        "type": "n8n-nodes-base.readBinaryFiles",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "filePath": "/data/input.csv"
+        }
+      },
+      {
+        "id": "spreadsheet",
+        "name": "Spreadsheet File",
+        "type": "n8n-nodes-base.spreadsheetFile",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "fromFile",
+          "fileFormat": "csv"
+        }
+      },
+      {
+        "id": "filter_data",
+        "name": "Filter",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{$json[\"amount\"]}}",
+                "operation": "larger",
+                "value2": 100
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "aggregate",
+        "name": "Aggregate",
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "fieldsToAggregate": {
+            "fieldToAggregate": [
+              {
+                "fieldToAggregate": "amount",
+                "aggregation": "sum"
+              }
+            ]
+          },
+          "groupByFields": {
+            "groupByField": [
+              "category"
+            ]
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Read Binary Files": {
+        "main": [
+          [
+            {
+              "node": "Spreadsheet File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Spreadsheet File": {
+        "main": [
+          [
+            {
+              "node": "Filter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter": {
+        "main": [
+          [
+            {
+              "node": "Aggregate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Complex Patterns: Retry Pattern
+  {
+    "nodes": [
+      {
+        "id": "start_retry",
+        "name": "Start",
+        "type": "n8n-nodes-base.start",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "set_retry_count",
+        "name": "Set Retry Count",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "mode": "manual",
+          "assignments": {
+            "assignments": [
+              {
+                "id": "retry_count",
+                "name": "retryCount",
+                "value": "={{$json.retryCount || 0}}",
+                "type": "number"
+              },
+              {
+                "id": "max_retries",
+                "name": "maxRetries",
+                "value": "3",
+                "type": "number"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "http_call",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/unstable-endpoint",
+          "options": {
+            "timeout": 5000
+          }
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "check_success",
+        "name": "Check Success",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{$node[\"HTTP Request\"].error}}",
+                "value2": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "check_retry_limit",
+        "name": "Check Retry Limit",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          1050,
+          200
+        ],
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{$json.retryCount}}",
+                "operation": "smaller",
+                "value2": "={{$json.maxRetries}}"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "increment_retry",
+        "name": "Increment Retry",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          1250,
+          100
+        ],
+        "parameters": {
+          "jsCode": "const retryCount = $json.retryCount + 1;\nconst waitTime = Math.pow(2, retryCount) * 1000; // Exponential backoff\n\nreturn [{\n  json: {\n    ...$json,\n    retryCount,\n    waitTime\n  }\n}];"
+        }
+      },
+      {
+        "id": "wait_backoff",
+        "name": "Wait Backoff",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1,
+        "position": [
+          1450,
+          100
+        ],
+        "parameters": {
+          "amount": "={{$json.waitTime}}",
+          "unit": "milliseconds"
+        }
+      }
+    ],
+    "connections": {
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "Set Retry Count",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Retry Count": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Check Success",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check Success": {
+        "main": [
+          [
+            {
+              "node": "Check Retry Limit",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Check Retry Limit": {
+        "main": [
+          [
+            {
+              "node": "Increment Retry",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      },
+      "Increment Retry": {
+        "main": [
+          [
+            {
+              "node": "Wait Backoff",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait Backoff": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Integration Patterns: Stripe Payment to Invoice
+  {
+    "nodes": [
+      {
+        "id": "stripe_trigger",
+        "name": "Stripe Trigger",
+        "type": "n8n-nodes-base.stripeTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "events": [
+            "charge.succeeded"
+          ]
+        }
+      },
+      {
+        "id": "create_invoice",
+        "name": "QuickBooks",
+        "type": "n8n-nodes-base.quickbooks",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "create",
+          "resource": "invoice",
+          "additionalFields": {
+            "customerRef": "={{$json[\"customer\"]}}",
+            "amount": "={{$json[\"amount\"]/100}}"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Stripe Trigger": {
+        "main": [
+          [
+            {
+              "node": "QuickBooks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Integration Patterns: Airtable to Notion
+  {
+    "nodes": [
+      {
+        "id": "airtable_list",
+        "name": "Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "operation": "list",
+          "base": "BASE_ID",
+          "table": "TABLE_ID"
+        }
+      },
+      {
+        "id": "notion_create",
+        "name": "Notion",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "create",
+          "resource": "databasePage",
+          "databaseId": "DATABASE_ID",
+          "properties": {
+            "property": [
+              {
+                "key": "Name",
+                "title": "={{$json[\"fields\"][\"Name\"]}}"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Airtable": {
+        "main": [
+          [
+            {
+              "node": "Notion",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Integration Patterns: Shopify Order to CRM
+  {
+    "nodes": [
+      {
+        "id": "shopify_trigger",
+        "name": "Shopify Trigger",
+        "type": "n8n-nodes-base.shopifyTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "event": "orderCreated"
+        }
+      },
+      {
+        "id": "hubspot_deal",
+        "name": "HubSpot",
+        "type": "n8n-nodes-base.hubspot",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "resource": "deal",
+          "operation": "create",
+          "dealName": "Order #{{$json.name}}",
+          "dealStage": "contractsent",
+          "additionalFields": {
+            "amount": "={{$json.total_price}}",
+            "closeDate": "={{$json.created_at}}"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Shopify Trigger": {
+        "main": [
+          [
+            {
+              "node": "HubSpot",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Integration Patterns: Calendly to Google Calendar
+  {
+    "nodes": [
+      {
+        "id": "calendly_webhook",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/calendly-events",
+          "httpMethod": "POST"
+        }
+      },
+      {
+        "id": "google_calendar",
+        "name": "Google Calendar",
+        "type": "n8n-nodes-base.googleCalendar",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "create",
+          "calendar": "primary",
+          "summary": "{{$json.event.name}} - {{$json.invitee.name}}",
+          "start": "={{$json.event.start_time}}",
+          "end": "={{$json.event.end_time}}",
+          "description": "Calendly booking with {{$json.invitee.email}}"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Google Calendar",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Notification Patterns: Multi-Channel Alert
+  {
+    "nodes": [
+      {
+        "id": "trigger_alert",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "send_email",
+        "name": "Send Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          450,
+          200
+        ],
+        "parameters": {
+          "fromEmail": "alerts@example.com",
+          "toEmail": "admin@example.com",
+          "subject": "Alert: {{$json[\"alertType\"]}}",
+          "text": "{{$json[\"message\"]}}"
+        }
+      },
+      {
+        "id": "send_slack",
+        "name": "Slack",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "resource": "message",
+          "operation": "post",
+          "channel": "#alerts",
+          "text": "🚨 Alert: {{$json[\"alertType\"]}}\n{{$json[\"message\"]}}"
+        }
+      },
+      {
+        "id": "send_sms",
+        "name": "Twilio",
+        "type": "n8n-nodes-base.twilio",
+        "typeVersion": 1,
+        "position": [
+          450,
+          400
+        ],
+        "parameters": {
+          "operation": "send",
+          "from": "+1234567890",
+          "to": "+0987654321",
+          "message": "Alert: {{$json[\"alertType\"]}} - {{$json[\"message\"]}}"
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Send Email",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Slack",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Twilio",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Data Transformation: JSON to CSV Export
+  {
+    "nodes": [
+      {
+        "id": "get_data",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/data"
+        }
+      },
+      {
+        "id": "convert_csv",
+        "name": "Convert to File",
+        "type": "n8n-nodes-base.convertToFile",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "csv",
+          "fileName": "export.csv"
+        }
+      },
+      {
+        "id": "save_drive",
+        "name": "Google Drive",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "operation": "upload",
+          "name": "={{$now.format('YYYY-MM-DD')}}_export.csv"
+        }
+      }
+    ],
+    "connections": {
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "Convert to File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Convert to File": {
+        "main": [
+          [
+            {
+              "node": "Google Drive",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Data Transformation: Merge Data Sources
+  {
+    "nodes": [
+      {
+        "id": "start_merge",
+        "name": "Start",
+        "type": "n8n-nodes-base.start",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "get_api_data",
+        "name": "API Data",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          450,
+          200
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/users"
+        }
+      },
+      {
+        "id": "get_db_data",
+        "name": "Database Data",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2,
+        "position": [
+          450,
+          400
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT * FROM user_metadata"
+        }
+      },
+      {
+        "id": "merge_data",
+        "name": "Merge",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 2,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "mode": "combine",
+          "combinationMode": "mergeByKey",
+          "propertyName1": "id",
+          "propertyName2": "user_id"
+        }
+      }
+    ],
+    "connections": {
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "API Data",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Database Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "API Data": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Database Data": {
+        "main": [
+          [
+            {
+              "node": "Merge",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Database Patterns: Database Backup
+  {
+    "nodes": [
+      {
+        "id": "schedule",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 2 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "mysql_export",
+        "name": "MySQL",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT * FROM important_table"
+        }
+      },
+      {
+        "id": "convert_json",
+        "name": "Convert to File",
+        "type": "n8n-nodes-base.convertToFile",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "operation": "json",
+          "fileName": "backup_{{$now.format('YYYY-MM-DD')}}.json"
+        }
+      },
+      {
+        "id": "s3_upload",
+        "name": "AWS S3",
+        "type": "n8n-nodes-base.awsS3",
+        "typeVersion": 1,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "operation": "upload",
+          "bucketName": "backups",
+          "fileName": "=/db/{{$json[\"fileName\"]}}"
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "MySQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "MySQL": {
+        "main": [
+          [
+            {
+              "node": "Convert to File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Convert to File": {
+        "main": [
+          [
+            {
+              "node": "AWS S3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Database Patterns: MongoDB Aggregation
+  {
+    "nodes": [
+      {
+        "id": "mongo_aggregate",
+        "name": "MongoDB",
+        "type": "n8n-nodes-base.mongoDb",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "operation": "aggregate",
+          "collection": "orders",
+          "pipeline": [
+            {
+              "$match": {
+                "status": "completed"
+              }
+            },
+            {
+              "$group": {
+                "_id": "$customerId",
+                "totalSpent": {
+                  "$sum": "$amount"
+                },
+                "orderCount": {
+                  "$sum": 1
+                }
+              }
+            },
+            {
+              "$sort": {
+                "totalSpent": -1
+              }
+            },
+            {
+              "$limit": 10
+            }
+          ]
+        }
+      }
+    ],
+    "connections": {}
+  }
+  
+  // Database Patterns: Redis Cache Pattern
+  {
+    "nodes": [
+      {
+        "id": "webhook_cache",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/get-data",
+          "httpMethod": "GET"
+        }
+      },
+      {
+        "id": "check_cache",
+        "name": "Redis Get",
+        "type": "n8n-nodes-base.redis",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "get",
+          "key": "cache:{{$json.query.id}}"
+        },
+        "continueOnFail": true
+      },
+      {
+        "id": "cache_exists",
+        "name": "Cache Exists?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json.value}}",
+                "operation": "isNotEmpty"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "fetch_fresh",
+        "name": "Fetch Fresh Data",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          850,
+          400
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/data/{{$json.query.id}}"
+        }
+      },
+      {
+        "id": "set_cache",
+        "name": "Redis Set",
+        "type": "n8n-nodes-base.redis",
+        "typeVersion": 1,
+        "position": [
+          1050,
+          400
+        ],
+        "parameters": {
+          "operation": "set",
+          "key": "cache:{{$json.query.id}}",
+          "value": "={{JSON.stringify($json)}}",
+          "expire": true,
+          "ttl": 3600
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Redis Get",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Redis Get": {
+        "main": [
+          [
+            {
+              "node": "Cache Exists?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cache Exists?": {
+        "main": [
+          [],
+          [
+            {
+              "node": "Fetch Fresh Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Fresh Data": {
+        "main": [
+          [
+            {
+              "node": "Redis Set",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Monitoring Patterns: Website Monitor
+  {
+    "nodes": [
+      {
+        "id": "interval",
+        "name": "Interval",
+        "type": "n8n-nodes-base.interval",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "interval": 5,
+          "unit": "minutes"
+        }
+      },
+      {
+        "id": "check_site",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://example.com",
+          "options": {
+            "timeout": 10000,
+            "ignoreResponseStatusErrors": true
+          }
+        }
+      },
+      {
+        "id": "check_status",
+        "name": "IF",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{$json[\"statusCode\"]}}",
+                "operation": "notEqual",
+                "value2": 200
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "alert",
+        "name": "Send Alert",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1,
+        "position": [
+          850,
+          200
+        ],
+        "parameters": {
+          "operation": "sendMessage",
+          "chatId": "@monitoring",
+          "text": "🔴 Website Down!\nStatus: {{$json[\"statusCode\"]}}\nTime: {{$now}}"
+        }
+      }
+    ],
+    "connections": {
+      "Interval": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "IF",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF": {
+        "main": [
+          [
+            {
+              "node": "Send Alert",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          []
+        ]
+      }
+    }
+  }
+  
+  // File Processing: Process Uploaded Files
+  {
+    "nodes": [
+      {
+        "id": "file_upload",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/upload",
+          "httpMethod": "POST",
+          "rawBody": true
+        }
+      },
+      {
+        "id": "save_file",
+        "name": "Write Binary File",
+        "type": "n8n-nodes-base.writeBinaryFile",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "fileName": "/tmp/upload_{{$now.toMillis()}}.csv"
+        }
+      },
+      {
+        "id": "read_csv",
+        "name": "Spreadsheet File",
+        "type": "n8n-nodes-base.spreadsheetFile",
+        "typeVersion": 2,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "operation": "fromFile",
+          "fileFormat": "csv"
+        }
+      },
+      {
+        "id": "process_rows",
+        "name": "Process Rows",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Process each row\nreturn $input.all().map(item => ({\n  json: {\n    ...item.json,\n    processed: true,\n    processedAt: new Date().toISOString()\n  }\n}));"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Write Binary File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Write Binary File": {
+        "main": [
+          [
+            {
+              "node": "Spreadsheet File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Spreadsheet File": {
+        "main": [
+          [
+            {
+              "node": "Process Rows",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // File Processing: Image Optimization
+  {
+    "nodes": [
+      {
+        "id": "image_webhook",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/upload-image",
+          "httpMethod": "POST",
+          "rawBody": true
+        }
+      },
+      {
+        "id": "resize_image",
+        "name": "Edit Image",
+        "type": "n8n-nodes-base.editImage",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "resize",
+          "width": 1200,
+          "height": 800,
+          "options": {
+            "format": "jpeg",
+            "quality": 85
+          }
+        }
+      },
+      {
+        "id": "upload_s3",
+        "name": "AWS S3",
+        "type": "n8n-nodes-base.awsS3",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "operation": "upload",
+          "bucketName": "images",
+          "fileName": "=/optimized/{{$now.format('YYYY-MM-DD')}}/{{$binary.data.fileName}}"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Edit Image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Edit Image": {
+        "main": [
+          [
+            {
+              "node": "AWS S3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Workflow Orchestration: Sub-workflow Pattern
+  {
+    "nodes": [
+      {
+        "id": "start_orchestration",
+        "name": "Start",
+        "type": "n8n-nodes-base.start",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "determine_type",
+        "name": "Switch",
+        "type": "n8n-nodes-base.switch",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "dataType": "string",
+          "value1": "={{$json.dataType}}",
+          "rules": {
+            "rules": [
+              {
+                "value2": "customer",
+                "output": 0
+              },
+              {
+                "value2": "order",
+                "output": 1
+              },
+              {
+                "value2": "product",
+                "output": 2
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "process_customer",
+        "name": "Customer Workflow",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1,
+        "position": [
+          650,
+          200
+        ],
+        "parameters": {
+          "workflowId": "CUSTOMER_WORKFLOW_ID"
+        }
+      },
+      {
+        "id": "process_order",
+        "name": "Order Workflow",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "workflowId": "ORDER_WORKFLOW_ID"
+        }
+      },
+      {
+        "id": "process_product",
+        "name": "Product Workflow",
+        "type": "n8n-nodes-base.executeWorkflow",
+        "typeVersion": 1,
+        "position": [
+          650,
+          400
+        ],
+        "parameters": {
+          "workflowId": "PRODUCT_WORKFLOW_ID"
+        }
+      },
+      {
+        "id": "combine_results",
+        "name": "Combine Results",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 2,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "mode": "combine",
+          "combinationMode": "multiplex"
+        }
+      }
+    ],
+    "connections": {
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "Switch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch": {
+        "main": [
+          [
+            {
+              "node": "Customer Workflow",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Order Workflow",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Product Workflow",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Customer Workflow": {
+        "main": [
+          [
+            {
+              "node": "Combine Results",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Order Workflow": {
+        "main": [
+          [
+            {
+              "node": "Combine Results",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Product Workflow": {
+        "main": [
+          [
+            {
+              "node": "Combine Results",
+              "type": "main",
+              "index": 2
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Social Media: Cross-Post Content
+  {
+    "nodes": [
+      {
+        "id": "content_trigger",
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ]
+      },
+      {
+        "id": "format_content",
+        "name": "Format Content",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Format content for different platforms\nconst baseContent = $json.content;\nconst link = $json.link || '';\n\nreturn [{\n  json: {\n    twitter: baseContent.substring(0, 280),\n    linkedin: `${baseContent}\\n\\n${link}`,\n    facebook: baseContent,\n    link: link\n  }\n}];"
+        }
+      },
+      {
+        "id": "post_twitter",
+        "name": "Twitter",
+        "type": "n8n-nodes-base.twitter",
+        "typeVersion": 2,
+        "position": [
+          650,
+          200
+        ],
+        "parameters": {
+          "operation": "create",
+          "text": "={{$json.twitter}}"
+        }
+      },
+      {
+        "id": "post_linkedin",
+        "name": "LinkedIn",
+        "type": "n8n-nodes-base.linkedIn",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "operation": "post",
+          "text": "={{$json.linkedin}}",
+          "shareMediaCategory": "NONE"
+        }
+      },
+      {
+        "id": "post_facebook",
+        "name": "Facebook",
+        "type": "n8n-nodes-base.facebookGraphApi",
+        "typeVersion": 1,
+        "position": [
+          650,
+          400
+        ],
+        "parameters": {
+          "resource": "post",
+          "operation": "create",
+          "pageId": "PAGE_ID",
+          "message": "={{$json.facebook}}"
+        }
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Format Content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Content": {
+        "main": [
+          [
+            {
+              "node": "Twitter",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "LinkedIn",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Facebook",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Social Media: Instagram Automation
+  {
+    "nodes": [
+      {
+        "id": "schedule_post",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours",
+                "hoursInterval": 24,
+                "triggerAtHour": 18
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "get_content",
+        "name": "Get Content",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "operation": "read",
+          "documentId": "SHEET_ID",
+          "sheetName": "Instagram Queue",
+          "filters": {
+            "filters": [
+              {
+                "field": "Posted",
+                "condition": "equal",
+                "value": "FALSE"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "generate_hashtags",
+        "name": "Generate Hashtags",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Generate relevant hashtags\nconst content = $json.caption;\nconst category = $json.category;\n\nconst hashtagMap = {\n  'tech': ['#tech', '#technology', '#innovation', '#coding'],\n  'lifestyle': ['#lifestyle', '#daily', '#life', '#instagood'],\n  'business': ['#business', '#entrepreneur', '#success', '#motivation']\n};\n\nconst hashtags = hashtagMap[category] || ['#instagram'];\n\nreturn [{\n  json: {\n    ...$json,\n    fullCaption: `${content}\\n\\n${hashtags.join(' ')}`\n  }\n}];"
+        }
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Content": {
+        "main": [
+          [
+            {
+              "node": "Generate Hashtags",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Data Validation: Form Validation Pipeline
+  {
+    "nodes": [
+      {
+        "id": "form_webhook",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "path": "/submit-form",
+          "httpMethod": "POST"
+        }
+      },
+      {
+        "id": "validate_data",
+        "name": "Validate Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Validate form data\nconst errors = [];\nconst data = $json;\n\n// Email validation\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailRegex.test(data.email)) {\n  errors.push('Invalid email format');\n}\n\n// Phone validation\nconst phoneRegex = /^[\\d\\s\\-\\+\\(\\)]+$/;\nif (data.phone && !phoneRegex.test(data.phone)) {\n  errors.push('Invalid phone format');\n}\n\n// Required fields\nconst required = ['name', 'email', 'message'];\nfor (const field of required) {\n  if (!data[field] || data[field].trim() === '') {\n    errors.push(`${field} is required`);\n  }\n}\n\nreturn [{\n  json: {\n    ...data,\n    isValid: errors.length === 0,\n    errors: errors\n  }\n}];"
+        }
+      },
+      {
+        "id": "check_valid",
+        "name": "Is Valid?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{$json.isValid}}",
+                "value2": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "process_valid",
+        "name": "Process Valid Data",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          850,
+          200
+        ],
+        "parameters": {
+          "responseCode": 200,
+          "responseBody": "{\"status\": \"success\", \"message\": \"Form submitted successfully\"}"
+        }
+      },
+      {
+        "id": "return_errors",
+        "name": "Return Errors",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          850,
+          400
+        ],
+        "parameters": {
+          "responseCode": 400,
+          "responseBody": "={{JSON.stringify({status: 'error', errors: $json.errors})}}"
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Validate Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Data": {
+        "main": [
+          [
+            {
+              "node": "Is Valid?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Valid?": {
+        "main": [
+          [
+            {
+              "node": "Process Valid Data",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Return Errors",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }
+  
+  // Batch Processing: Batch Process Large Dataset
+  {
+    "nodes": [
+      {
+        "id": "get_total",
+        "name": "Get Total Records",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          250,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/count"
+        }
+      },
+      {
+        "id": "prepare_batches",
+        "name": "Prepare Batches",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          450,
+          300
+        ],
+        "parameters": {
+          "jsCode": "// Create batch parameters\nconst total = $json.count;\nconst batchSize = 100;\nconst batches = [];\n\nfor (let offset = 0; offset < total; offset += batchSize) {\n  batches.push({\n    json: {\n      offset: offset,\n      limit: batchSize,\n      batchNumber: Math.floor(offset / batchSize) + 1,\n      totalBatches: Math.ceil(total / batchSize)\n    }\n  });\n}\n\nreturn batches;"
+        }
+      },
+      {
+        "id": "process_batch",
+        "name": "Process Batch",
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 1,
+        "position": [
+          650,
+          300
+        ],
+        "parameters": {
+          "batchSize": 1
+        }
+      },
+      {
+        "id": "fetch_batch",
+        "name": "Fetch Batch Data",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          850,
+          300
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.example.com/data",
+          "qs": {
+            "parameters": [
+              {
+                "name": "offset",
+                "value": "={{$json.offset}}"
+              },
+              {
+                "name": "limit",
+                "value": "={{$json.limit}}"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "wait_rate_limit",
+        "name": "Rate Limit Wait",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1,
+        "position": [
+          1050,
+          300
+        ],
+        "parameters": {
+          "amount": 1,
+          "unit": "seconds"
+        }
+      }
+    ],
+    "connections": {
+      "Get Total Records": {
+        "main": [
+          [
+            {
+              "node": "Prepare Batches",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Prepare Batches": {
+        "main": [
+          [
+            {
+              "node": "Process Batch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Process Batch": {
+        "main": [
+          [
+            {
+              "node": "Fetch Batch Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Fetch Batch Data": {
+        "main": [
+          [
+            {
+              "node": "Rate Limit Wait",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Rate Limit Wait": {
+        "main": [
+          [
+            {
+              "node": "Process Batch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    }
+  }

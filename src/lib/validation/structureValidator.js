@@ -177,6 +177,41 @@ export class StructureValidator {
   }
 
   /**
+   * Validate Gmail node
+   */
+  validateGmailNode(node) {
+    const errors = [];
+    const warnings = [];
+    
+    // Check for generic field references in Gmail nodes
+    const nodeStr = JSON.stringify(node);
+    if (nodeStr.includes('$json["field"]')) {
+      errors.push({
+        node: node.name,
+        type: 'gmail_generic_field',
+        message: 'Gmail node contains generic field reference instead of proper Gmail structure',
+        severity: 'high',
+        suggestion: 'Use proper Gmail field references like $json["headers"]["subject"] or $json["headers"]["from"]'
+      });
+    }
+    
+    // Check for invalid Gmail field patterns
+    for (const pattern of this.invalidPatterns.invalidGmailFields) {
+      if (pattern.test(nodeStr)) {
+        errors.push({
+          node: node.name,
+          type: 'invalid_gmail_field_reference',
+          message: 'Gmail node uses incorrect field reference pattern',
+          severity: 'high',
+          suggestion: 'Gmail fields should be accessed via headers object: $json["headers"]["fieldname"]'
+        });
+      }
+    }
+    
+    return { errors, warnings };
+  }
+
+  /**
    * Validate individual IF condition
    */
   validateIfCondition(condition, node, previousNode, index) {

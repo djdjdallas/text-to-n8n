@@ -73,6 +73,19 @@ export class ConditionFixer {
     const previousNodeType = previousNode?.type || '';
     const workflowName = workflowContext.workflowName?.toLowerCase() || '';
     
+    // Special case: Check Rating Level nodes
+    if (nodeName.includes('check rating level') || nodeName.includes('rating level')) {
+      logger.info(`  🌟 Detected "Check Rating Level" node - creating rating condition`);
+      return {
+        replace: false,
+        condition: {
+          leftValue: '={{$json.rating}}',
+          rightValue: '3',
+          operation: 'smallerEqual'
+        }
+      };
+    }
+    
     // Detect the intent based on node name
     const intent = this.detectIntent(nodeName, workflowName);
     logger.info(`  🎯 Detected intent: ${intent}`);

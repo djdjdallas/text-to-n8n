@@ -523,7 +523,7 @@ export class WorkflowFormatFixer {
 
         // Fix IF nodes
         if (node.type === "n8n-nodes-base.if") {
-          this.fixIfNode(node);
+          this.fixIfNode(node, fixed);
         }
 
         // Fix Google Sheets nodes
@@ -1134,13 +1134,27 @@ export class WorkflowFormatFixer {
   /**
    * Fix IF node conditions
    */
-  fixIfNode(node) {
+  fixIfNode(node, workflow) {
     if (!node.parameters) node.parameters = {};
 
     logger.info(`🔧 Fixing IF node: ${node.name}`);
 
     // Handle various condition formats
     if (node.parameters.conditions) {
+      // Check if using boolean conditions (v1 format)
+      if (node.parameters.conditions.boolean && node.parameters.conditions.boolean.length > 0) {
+        console.log(`  📝 Using boolean conditions format (v1)`);
+        // Preserve boolean conditions format
+        const combineOperation = node.parameters.combineOperation || "all";
+        // Don't double-nest - keep conditions at the correct level
+        node.parameters.conditions = {
+          boolean: node.parameters.conditions.boolean
+        };
+        // Set combineOperation at the parameters level
+        node.parameters.combineOperation = combineOperation;
+        return; // Exit early for boolean conditions
+      }
+
       // REMOVE the "number" field if it exists (it's invalid)
       if (node.parameters.conditions.number) {
         console.log(`  ❌ Removing invalid "number" field from IF node conditions`);
@@ -1182,8 +1196,18 @@ export class WorkflowFormatFixer {
             const fixedCondition = {
               leftValue: condition.leftValue || '={{$json["field"]}}',
               rightValue: condition.rightValue || "",
-              operation: condition.operation || "equal",
             };
+
+            // Handle operator objects properly
+            if (condition.operator && typeof condition.operator === 'object') {
+              // Convert complex operator to simple string
+              fixedCondition.operation = condition.operator.operation || 'equal';
+            } else if (condition.operation) {
+              fixedCondition.operation = condition.operation;
+            } else {
+              // Default fallback
+              fixedCondition.operation = 'equal';
+            }
 
             // CRITICAL: Validate and fix leftValue property references
             if (fixedCondition.leftValue) {
@@ -1231,8 +1255,23 @@ export class WorkflowFormatFixer {
               delete fixedCondition.conditions;
             }
 
+            // Map operators to correct n8n format
+            const operatorMappings = {
+              'largerThan': 'larger',
+              'smallerThan': 'smaller',
+              'smallerEqual': 'smallerEqual',
+              'largerEqual': 'largerEqual',
+              'notEqual': 'notEqual'
+            };
+            
+            // Apply operator mapping if needed
+            if (operatorMappings[fixedCondition.operation]) {
+              console.log(`  📝 Mapping operator: ${fixedCondition.operation} → ${operatorMappings[fixedCondition.operation]}`);
+              fixedCondition.operation = operatorMappings[fixedCondition.operation];
+            }
+
             // CRITICAL: Validate the condition structure matches n8n requirements
-            const validOperations = ['equal', 'notEqual', 'contains', 'notContains', 'startsWith', 'notStartsWith', 'endsWith', 'notEndsWith', 'regex', 'notRegex', 'larger', 'largerEqual', 'smaller', 'smallerEqual', 'exists', 'notExists', 'largerThan', 'smallerThan'];
+            const validOperations = ['equal', 'notEqual', 'contains', 'notContains', 'startsWith', 'notStartsWith', 'endsWith', 'notEndsWith', 'regex', 'notRegex', 'larger', 'largerEqual', 'smaller', 'smallerEqual', 'exists', 'notExists'];
             if (!validOperations.includes(fixedCondition.operation)) {
               console.log(`  ❌ Invalid operation "${fixedCondition.operation}", defaulting to "equal"`);
               fixedCondition.operation = 'equal';
@@ -1320,14 +1359,39 @@ export class WorkflowFormatFixer {
 
       // Ensure at least one condition exists
       if (node.parameters.conditions.conditions.length === 0) {
-        console.log(`  ⚠️ No valid conditions found, creating default condition`);
-        node.parameters.conditions.conditions = [
-          {
-            leftValue: '={{$json["field"]}}',
-            rightValue: "",
-            operation: "equal",
-          },
-        ];
+        console.log(`🔧 No valid conditions found for ${node.name}, applying context fix...`);
+        
+        // Find previous node
+        const previousNode = this.findPreviousNode(workflow, node);
+        
+        // Create workflow context
+        const workflowContext = {
+          workflowName: workflow.name || '',
+          allNodes: workflow.nodes,
+          connections: workflow.connections
+        };
+        
+        // Try to fix with context
+        const contextFix = conditionFixer.fixConditionBasedOnContext(
+          node,
+          previousNode,
+          workflowContext
+        );
+        
+        if (contextFix && !contextFix.replace && contextFix.condition) {
+          console.log(`✅ Applied context-aware fix for ${node.name}`);
+          node.parameters.conditions.conditions = [contextFix.condition];
+        } else {
+          // Only use generic placeholder as last resort
+          console.log(`⚠️ Using generic placeholder for ${node.name}`);
+          node.parameters.conditions.conditions = [
+            {
+              leftValue: '={{$json["field"]}}',
+              rightValue: "",
+              operation: "equal",
+            },
+          ];
+        }
       }
 
       // Remove invalid combinator field
@@ -1351,22 +1415,66 @@ export class WorkflowFormatFixer {
       }
 
     } else {
-      // No conditions at all - create default
-      console.log(`  ⚠️ No conditions object found, creating default`);
-      node.parameters.conditions = {
-        conditions: [
-          {
-            leftValue: '={{$json["field"]}}',
-            rightValue: "",
-            operation: "equal",
-          },
-        ],
+      // No conditions at all - try context-aware fix first
+      console.log(`🔧 No conditions object found for ${node.name}, applying context fix...`);
+      
+      // Find previous node
+      const previousNode = this.findPreviousNode(workflow, node);
+      
+      // Create workflow context
+      const workflowContext = {
+        workflowName: workflow.name || '',
+        allNodes: workflow.nodes,
+        connections: workflow.connections
       };
+      
+      // Try to fix with context
+      const contextFix = conditionFixer.fixConditionBasedOnContext(
+        node,
+        previousNode,
+        workflowContext
+      );
+      
+      if (contextFix && !contextFix.replace && contextFix.condition) {
+        console.log(`✅ Applied context-aware fix for ${node.name}`);
+        node.parameters.conditions = {
+          conditions: [contextFix.condition],
+        };
+      } else {
+        // Only use generic placeholder as last resort
+        console.log(`⚠️ Using generic placeholder for ${node.name}`);
+        node.parameters.conditions = {
+          conditions: [
+            {
+              leftValue: '={{$json["field"]}}',
+              rightValue: "",
+              operation: "equal",
+            },
+          ],
+        };
+      }
     }
 
     // Set combineOperation if not set
     if (!node.parameters.combineOperation) {
       node.parameters.combineOperation = "all";
+    }
+
+    // For v2 conditions format, wrap conditions properly with options
+    if (node.parameters.conditions && node.parameters.conditions.conditions && !node.parameters.conditions.boolean) {
+      console.log(`  📝 Formatting conditions for v2 format`);
+      const fixedConditions = node.parameters.conditions.conditions;
+      const combineOperation = node.parameters.combineOperation || "all";
+      
+      node.parameters.conditions = {
+        options: {
+          caseSensitive: true,
+          leftValue: "",
+          typeValidation: "strict"
+        },
+        conditions: fixedConditions,
+        combineOperation: combineOperation
+      };
     }
 
     // FINAL VALIDATION: Log the final IF node structure

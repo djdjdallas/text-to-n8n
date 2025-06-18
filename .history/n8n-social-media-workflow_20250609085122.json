@@ -1,0 +1,732 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "hours"
+              }
+            ]
+          }
+        },
+        "id": "2e0fa170-4b42-4671-84ab-5ebb7917e8d9",
+        "name": "Schedule Trigger - Hourly Analysis",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          -260,
+          160
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://your-n8n-url/webhook/hashtag-analysis-trigger",
+          "options": {}
+        },
+        "id": "579ae1b4-2114-406c-89ce-ec4127ccea26",
+        "name": "Trigger Hashtag Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          -40,
+          160
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "path": "hashtag-analysis-trigger",
+          "options": {}
+        },
+        "id": "11d733cc-e82d-495b-9aff-09598a53d055",
+        "name": "Webhook Trigger",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          -260,
+          880
+        ],
+        "typeVersion": 1,
+        "webhookId": "d95a295b-4f95-4e7c-b196-1ea2365854f0"
+      },
+      {
+        "parameters": {
+          "batchSize": 1,
+          "options": {}
+        },
+        "id": "aa154f94-8d01-4b1a-92ff-e5d143409904",
+        "name": "Split Analysis Tasks",
+        "type": "n8n-nodes-base.splitInBatches",
+        "position": [
+          -40,
+          880
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "url": "https://api.twitter.com/2/trends/place/1",
+          "authentication": "oAuth2",
+          "options": {}
+        },
+        "id": "61654bac-3841-4629-ad21-862888579127",
+        "name": "Twitter Hashtag Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          180,
+          680
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "url": "https://graph.instagram.com/v12.0/ig_hashtag_search",
+          "authentication": "oAuth2",
+          "options": {}
+        },
+        "id": "01e8d817-bada-4303-9650-28ea2469580c",
+        "name": "Instagram Hashtag Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          180,
+          880
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "url": "https://open-api.tiktok.com/trending/hashtags/",
+          "authentication": "oAuth2",
+          "options": {}
+        },
+        "id": "9ba2922f-cb00-40fa-8daf-5aea81adec0d",
+        "name": "TikTok Hashtag Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          180,
+          1080
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "mode": "combine",
+          "combinationMode": "mergeByPosition",
+          "options": {}
+        },
+        "id": "29b5b226-a819-452a-bb0a-a3d16c7b4f9c",
+        "name": "Merge Hashtag Data",
+        "type": "n8n-nodes-base.merge",
+        "position": [
+          400,
+          780
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://your-n8n-url/webhook/ai-content-generation-trigger",
+          "options": {}
+        },
+        "id": "8535c7fd-723c-4bec-b113-4881cf45e575",
+        "name": "Trigger AI Content Generation",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          620,
+          780
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "operation": "text",
+          "requestOptions": {}
+        },
+        "id": "61dcec35-6bf4-4f4f-b3fa-5aae263d19c0",
+        "name": "AI Content Generator",
+        "type": "n8n-nodes-base.openAi",
+        "position": [
+          -40,
+          420
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": "content_queue",
+          "options": {}
+        },
+        "id": "b505ead3-5655-4286-88ae-e1aa8eb34ff1",
+        "name": "Database - Store Generated Content",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          180,
+          420
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://your-n8n-url/webhook/content-distribution-trigger",
+          "options": {}
+        },
+        "id": "0bf4d1c1-67ed-4718-8f0b-018b970ddce1",
+        "name": "Trigger Content Distribution",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          400,
+          420
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "path": "ai-content-generation-trigger",
+          "options": {}
+        },
+        "id": "44ce29e7-1eae-4dfa-80fe-062a92071502",
+        "name": "Webhook Trigger1",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          -260,
+          420
+        ],
+        "typeVersion": 1,
+        "webhookId": "49a8d6fa-a6ec-459b-a59c-2bd41c43f180"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Analyze historical engagement data to find optimal posting times\nconst platform = $input.item.json.platform || 'twitter'; // Default to twitter if not specified\nconst timezone = 'America/New_York';\n\nconst optimalTimes = {\n  twitter: ['9:00', '12:00', '17:00', '20:00'],\n  instagram: ['8:00', '13:00', '18:00'],\n  tiktok: ['6:00', '10:00', '19:00', '23:00']\n};\n\n// Get current hour\nconst now = new Date();\nconst currentHour = now.getHours();\n\n// Find next optimal time\nconst platformTimes = optimalTimes[platform.toLowerCase()] || optimalTimes.twitter;\nlet nextOptimalTime = platformTimes.find(time => {\n  const [hour] = time.split(':').map(Number);\n  return hour > currentHour;\n}) || platformTimes[0];\n\nreturn {\n  platform,\n  nextOptimalTime,\n  shouldPostNow: platformTimes.some(time => time.split(':')[0] == currentHour),\n  content: $input.item.json.content,\n  imageUrl: $input.item.json.imageUrl || '' // Pass imageUrl if available\n};\n"
+        },
+        "id": "b6d5df18-fdbe-469a-a796-af637ec11895",
+        "name": "Calculate Optimal Posting Time",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          -40,
+          1540
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "operation": "tweet"
+        },
+        "id": "526f80e2-e078-43a0-9c54-154c0c002c86",
+        "name": "Post to Twitter",
+        "type": "n8n-nodes-base.twitter",
+        "position": [
+          180,
+          1340
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://graph.instagram.com/me/media",
+          "authentication": "oAuth2",
+          "options": {}
+        },
+        "id": "884720b1-f4bc-45ec-8521-5b658604baf1",
+        "name": "Post to Instagram",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          180,
+          1540
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://open-api.tiktok.com/share/video/upload",
+          "authentication": "oAuth2",
+          "options": {}
+        },
+        "id": "a9f5e599-d060-4560-9606-cfb8ef4ce8c3",
+        "name": "Post to TikTok",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          180,
+          1740
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "path": "content-distribution-trigger",
+          "options": {}
+        },
+        "id": "a718f8d6-d1e4-4cd9-a1b3-6a3abf4acc59",
+        "name": "Webhook Trigger2",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          -260,
+          1540
+        ],
+        "typeVersion": 1,
+        "webhookId": "efdb24c7-6c69-40c8-abf0-30a00d647031"
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {}
+            ]
+          }
+        },
+        "id": "f1da582e-f0af-45a7-aeb9-41a1dfc2e1de",
+        "name": "Follower Analysis Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "position": [
+          -260,
+          -460
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "operation": "followersList"
+        },
+        "id": "99a02ea9-e14d-4db8-ad10-2dd6f8f572a9",
+        "name": "Get Followers List",
+        "type": "n8n-nodes-base.twitter",
+        "position": [
+          -40,
+          -560
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "operation": "followingList"
+        },
+        "id": "e10b74bf-8795-461a-ad05-9bb88eac3833",
+        "name": "Get Following List",
+        "type": "n8n-nodes-base.twitter",
+        "position": [
+          -40,
+          -360
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "jsCode": "const followers = $input.all()[0].json;\nconst following = $input.all()[1].json;\n\nconst followerIds = new Set(followers.map(f => f.id));\nconst nonFollowers = following.filter(f => !followerIds.has(f.id));\n\n// Identify influential followers (>10k followers)\nconst influentialFollowers = followers.filter(f => f.followersCount > 10000);\n\nreturn {\n  nonFollowers,\n  influentialFollowers,\n  followerCount: followers.length,\n  followingCount: following.length,\n  followRatio: followers.length / following.length\n};\n"
+        },
+        "id": "0c16c0a8-ba64-4184-b24a-5fe07893b69f",
+        "name": "Compare Follow Status",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          180,
+          -560
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "operation": "unfollow"
+        },
+        "id": "ccfd4ee6-a95c-45ae-9369-e824aea483cc",
+        "name": "Unfollow Non-Followers",
+        "type": "n8n-nodes-base.twitter",
+        "position": [
+          400,
+          -660
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": "growth_metrics",
+          "options": {}
+        },
+        "id": "28cd6eb0-d85b-44dd-933b-068c1378621a",
+        "name": "Track Growth Metrics",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          400,
+          -460
+        ],
+        "typeVersion": 2
+      },
+      {
+        "parameters": {
+          "jsCode": "// Calculate ROI based on various metrics\nconst metrics = $input.item.json;\n\nconst roi = {\n  followerGrowthRate: ((metrics.followers - (metrics.previousFollowers || 0)) / (metrics.previousFollowers || 1)) * 100, // Handle division by zero\n  engagementRate: ((metrics.totalEngagements || 0) / (metrics.followers || 1)) * 100,\n  costPerFollower: (metrics.adSpend || 0) / ((metrics.followers - (metrics.previousFollowers || 0)) || 1),\n  revenuePerFollower: (metrics.revenue || 0) / (metrics.followers || 1),\n  overallROI: (((metrics.revenue || 0) - (metrics.totalCosts || 0)) / ((metrics.totalCosts || 0) || 1)) * 100\n};\n\nreturn roi;\n"
+        },
+        "id": "694321aa-afaa-4b1c-bf95-06a76e47a04b",
+        "name": "ROI Calculator",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          620,
+          -460
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "operation": "text",
+          "requestOptions": {}
+        },
+        "id": "ba18789b-4f87-4602-97c2-35d1f073fc7f",
+        "name": "Strategy Adjustment AI",
+        "type": "n8n-nodes-base.openAi",
+        "position": [
+          840,
+          -460
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "path": "cross-platform-sync",
+          "options": {}
+        },
+        "id": "15118480-54ae-4236-b7d0-8b4cda048974",
+        "name": "Cross-Platform Sync Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          -260,
+          -100
+        ],
+        "typeVersion": 1,
+        "webhookId": "3e37d483-9380-4ac5-82e3-02334d15d809"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Manage engagement pods - groups of accounts that engage with each other\nconst podMembers = $input.item.json.podMembers || [];\nconst action = $input.item.json.action;\n\nif (action === 'engage') {\n  // Signal pod members to engage with new content\n  return podMembers.map(member => ({\n    memberId: member.id,\n    action: 'like_and_comment',\n    contentId: $input.item.json.contentId,\n    platform: $input.item.json.platform\n  }));\n} else if (action === 'recruit') {\n  // Find potential pod members from engaged followers\n  const engagedFollowers = $input.item.json.engagedFollowers;\n  return engagedFollowers\n    .filter(f => f.engagementScore > 0.8)\n    .slice(0, 10);\n}\n\nreturn { status: 'pod_managed' };\n"
+        },
+        "id": "7472df81-7854-4b4f-97d5-d0932358cb36",
+        "name": "Engagement Pod Manager",
+        "type": "n8n-nodes-base.code",
+        "position": [
+          -40,
+          -100
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "url": "https://api.socialtracker.io/v1/algorithm-changes",
+          "authentication": "headerAuth",
+          "options": {}
+        },
+        "id": "bfd4764b-ee04-41c6-8eba-ea8bfd82ad7c",
+        "name": "Platform Algorithm Monitor",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          180,
+          -100
+        ],
+        "typeVersion": 4
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{ $json.hasChanges }}",
+                "value2": true
+              }
+            ]
+          }
+        },
+        "id": "171a1000-6f24-4d60-9281-a8c28dd8d29a",
+        "name": "Adapt to Algorithm Changes",
+        "type": "n8n-nodes-base.if",
+        "position": [
+          400,
+          -100
+        ],
+        "typeVersion": 1
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": "strategy_parameters",
+          "options": {}
+        },
+        "id": "1886229f-7941-48df-a6c5-02d58aa6d458",
+        "name": "Update Strategy Parameters",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          620,
+          -100
+        ],
+        "typeVersion": 2
+      }
+    ],
+    "connections": {
+      "Schedule Trigger - Hourly Analysis": {
+        "main": [
+          [
+            {
+              "node": "Trigger Hashtag Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Trigger": {
+        "main": [
+          [
+            {
+              "node": "Split Analysis Tasks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Split Analysis Tasks": {
+        "main": [
+          [
+            {
+              "node": "Twitter Hashtag Analysis",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Instagram Hashtag Analysis",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "TikTok Hashtag Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Twitter Hashtag Analysis": {
+        "main": [
+          [
+            {
+              "node": "Merge Hashtag Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Instagram Hashtag Analysis": {
+        "main": [
+          [
+            {
+              "node": "Merge Hashtag Data",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Merge Hashtag Data": {
+        "main": [
+          [
+            {
+              "node": "Trigger AI Content Generation",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Content Generator": {
+        "main": [
+          [
+            {
+              "node": "Database - Store Generated Content",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Database - Store Generated Content": {
+        "main": [
+          [
+            {
+              "node": "Trigger Content Distribution",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Trigger1": {
+        "main": [
+          [
+            {
+              "node": "AI Content Generator",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Calculate Optimal Posting Time": {
+        "main": [
+          [
+            {
+              "node": "Post to Twitter",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Post to Instagram",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Post to TikTok",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook Trigger2": {
+        "main": [
+          [
+            {
+              "node": "Calculate Optimal Posting Time",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Follower Analysis Trigger": {
+        "main": [
+          [
+            {
+              "node": "Get Followers List",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Get Following List",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get Followers List": {
+        "main": [
+          [
+            {
+              "node": "Compare Follow Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Compare Follow Status": {
+        "main": [
+          [
+            {
+              "node": "Unfollow Non-Followers",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Track Growth Metrics",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Track Growth Metrics": {
+        "main": [
+          [
+            {
+              "node": "ROI Calculator",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "ROI Calculator": {
+        "main": [
+          [
+            {
+              "node": "Strategy Adjustment AI",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cross-Platform Sync Webhook": {
+        "main": [
+          [
+            {
+              "node": "Engagement Pod Manager",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Engagement Pod Manager": {
+        "main": [
+          [
+            {
+              "node": "Platform Algorithm Monitor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Platform Algorithm Monitor": {
+        "main": [
+          [
+            {
+              "node": "Adapt to Algorithm Changes",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Adapt to Algorithm Changes": {
+        "main": [
+          [
+            {
+              "node": "Update Strategy Parameters",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "instanceId": "62375cb333bb7eb451d769c5f8df76a42e5395ca4aa036a37eae78b491141162"
+    }
+  }

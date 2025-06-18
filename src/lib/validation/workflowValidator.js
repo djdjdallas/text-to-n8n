@@ -1,6 +1,7 @@
 // src/lib/validation/workflowValidator.js
 import { PLATFORMS, COMPLEXITY_LEVELS } from "@/lib/constants";
 import { platformSchemas } from "@/lib/validators/platformSchemas";
+import exampleLoader from "@/lib/examples/exampleLoader";
 
 /**
  * Comprehensive workflow validation system
@@ -19,6 +20,19 @@ export class WorkflowValidator {
       [PLATFORMS.ZAPIER]: platformSchemas.zapier.zap,
       [PLATFORMS.MAKE]: platformSchemas.make.scenario,
     };
+    
+    // Load examples for validation
+    this.examplesLoaded = false;
+    this.loadExamples();
+  }
+  
+  async loadExamples() {
+    try {
+      await exampleLoader.loadExamples();
+      this.examplesLoaded = true;
+    } catch (error) {
+      console.error('Failed to load examples:', error);
+    }
   }
 
   /**
@@ -107,6 +121,9 @@ class BaseValidator {
 
     // Logic validation
     this.validateLogic(workflow);
+    
+    // Example-based validation
+    await this.validateAgainstExamples(workflow);
 
     // Options-based validation
     if (options.errorHandling) {
@@ -214,6 +231,13 @@ class BaseValidator {
     score -= this.errors.length * 10;
     score -= this.warnings.length * 5;
     return Math.max(0, Math.min(100, score));
+  }
+  
+  /**
+   * Validate workflow against examples
+   */
+  async validateAgainstExamples(workflow) {
+    // To be implemented by specific validators
   }
 }
 
@@ -1043,6 +1067,194 @@ class N8NValidator extends BaseValidator {
     }
 
     return Math.max(0, Math.min(100, score));
+  }
+  
+  /**
+   * Validate workflow against examples
+   */
+  async validateAgainstExamples(workflow) {
+    try {
+      // Get relevant examples for this workflow
+      const relevantExamples = await exampleLoader.getRelevantExamples(workflow);
+      
+      if (relevantExamples.length === 0) return;
+      
+      // Check for node parameter structure matches
+      this.validateNodeParameterStructures(workflow, relevantExamples);
+      
+      // Check for connection patterns
+      this.validateConnectionPatterns(workflow, relevantExamples);
+      
+      // Check for missing best practices
+      this.suggestBestPractices(workflow, relevantExamples);
+      
+    } catch (error) {
+      console.error('Error validating against examples:', error);
+    }
+  }
+  
+  validateNodeParameterStructures(workflow, examples) {
+    for (const node of workflow.nodes) {
+      // Find examples with the same node type
+      const nodeExamples = examples.filter(example => 
+        example.nodes?.some(exampleNode => exampleNode.type === node.type)
+      );
+      
+      if (nodeExamples.length === 0) continue;
+      
+      // Get the reference node from examples
+      const referenceNode = nodeExamples[0].nodes.find(n => n.type === node.type);
+      
+      // Check for common parameter structure issues
+      this.validateParameterStructure(node, referenceNode);
+    }
+  }
+  
+  validateParameterStructure(node, referenceNode) {
+    if (!node.parameters || !referenceNode.parameters) return;
+    
+    // Check if node has deprecated or invalid parameter structures
+    const nodeParams = JSON.stringify(node.parameters);
+    const refParams = JSON.stringify(referenceNode.parameters);
+    
+    // Check for nested parameter issues (common in HTTP Request nodes)
+    if (node.type === 'n8n-nodes-base.httpRequest') {
+      if (node.parameters.queryParameters?.parameters && 
+          !referenceNode.parameters.queryParameters?.parameters) {
+        this.addError(
+          'NESTED_QUERY_PARAMS',
+          `HTTP Request node ${node.name} has nested queryParameters structure which causes errors`,
+          { node: node.name }
+        );
+      }
+    }
+    
+    // Check Set node structure
+    if (node.type === 'n8n-nodes-base.set') {
+      if (node.parameters.options && !referenceNode.parameters.options) {
+        this.addError(
+          'INVALID_SET_STRUCTURE',
+          `Set node ${node.name} has 'options' field which should be removed`,
+          { node: node.name }
+        );
+      }
+      
+      if (node.parameters.keepOnlySet !== undefined && 
+          referenceNode.parameters.keepOnlySet === undefined) {
+        this.addError(
+          'INVALID_SET_PARAM',
+          `Set node ${node.name} has 'keepOnlySet' parameter which causes import issues`,
+          { node: node.name }
+        );
+      }
+    }
+    
+    // Check Google Sheets node
+    if (node.type === 'n8n-nodes-base.googleSheets') {
+      if (node.parameters.options && !referenceNode.parameters.options) {
+        this.addError(
+          'INVALID_SHEETS_STRUCTURE',
+          `Google Sheets node ${node.name} has 'options' field which causes import errors`,
+          { node: node.name }
+        );
+      }
+    }
+    
+    // Check OpenAI node structure
+    if (node.type === '@n8n/n8n-nodes-langchain.openAi') {
+      const criticalParams = ['model', 'temperature', 'maxTokens'];
+      
+      criticalParams.forEach(param => {
+        const nodeHasInOptions = node.parameters.options?.[param] !== undefined;
+        const refHasAtRoot = referenceNode.parameters[param] !== undefined;
+        
+        if (nodeHasInOptions && refHasAtRoot) {
+          this.addError(
+            'INCORRECT_OPENAI_STRUCTURE',
+            `OpenAI node ${node.name} has '${param}' in options instead of root level`,
+            { node: node.name, param }
+          );
+        }
+      });
+    }
+  }
+  
+  validateConnectionPatterns(workflow, examples) {
+    // Check if workflow follows common connection patterns
+    const workflowNodeTypes = workflow.nodes.map(n => n.type);
+    
+    for (const example of examples) {
+      const exampleNodeTypes = example.nodes?.map(n => n.type) || [];
+      
+      // Check if it's a common pair pattern
+      if (exampleNodeTypes.length === 2 && workflowNodeTypes.length === 2) {
+        const hasMatchingPair = exampleNodeTypes.every(type => workflowNodeTypes.includes(type));
+        
+        if (hasMatchingPair) {
+          // Validate connection structure matches example
+          this.validatePairConnectionStructure(workflow, example);
+        }
+      }
+    }
+  }
+  
+  validatePairConnectionStructure(workflow, example) {
+    const workflowConnections = workflow.connections;
+    const exampleConnections = example.connections;
+    
+    // Check if connections follow the expected pattern
+    const exampleSourceNames = Object.keys(exampleConnections);
+    const workflowSourceNames = Object.keys(workflowConnections);
+    
+    if (exampleSourceNames.length === 1 && workflowSourceNames.length === 0) {
+      this.addWarning(
+        'MISSING_CONNECTIONS',
+        'Workflow nodes are not connected. Expected connection pattern found in examples.',
+        { expectedPattern: 'node1 -> node2' }
+      );
+    }
+  }
+  
+  suggestBestPractices(workflow, examples) {
+    // Suggest improvements based on examples
+    const workflowNodeTypes = workflow.nodes.map(n => n.type);
+    
+    // Check for error handling patterns
+    const hasErrorHandling = workflow.nodes.some(n => n.continueOnFail);
+    const exampleHasErrorHandling = examples.some(ex => 
+      ex.nodes?.some(n => n.continueOnFail)
+    );
+    
+    if (!hasErrorHandling && exampleHasErrorHandling) {
+      this.addSuggestion(
+        'Consider adding error handling (continueOnFail) to critical nodes, as shown in similar examples'
+      );
+    }
+    
+    // Check for missing IF nodes in conditional workflows
+    const hasConditional = workflowNodeTypes.some(t => t.includes('if') || t.includes('switch'));
+    const exampleHasConditional = examples.some(ex => 
+      ex.nodes?.some(n => n.type.includes('if') || n.type.includes('switch'))
+    );
+    
+    if (!hasConditional && exampleHasConditional && workflow.nodes.length > 2) {
+      this.addSuggestion(
+        'Consider adding conditional logic (IF/Switch nodes) for better workflow control, as shown in similar examples'
+      );
+    }
+    
+    // Check for data validation patterns
+    const hasValidation = workflowNodeTypes.some(t => t.includes('code')) && 
+      workflow.nodes.some(n => JSON.stringify(n.parameters).includes('validate'));
+    const exampleHasValidation = examples.some(ex => 
+      ex.nodes?.some(n => n.type.includes('code') && JSON.stringify(n.parameters).includes('validate'))
+    );
+    
+    if (!hasValidation && exampleHasValidation) {
+      this.addSuggestion(
+        'Consider adding data validation steps as shown in similar workflow examples'
+      );
+    }
   }
 }
 

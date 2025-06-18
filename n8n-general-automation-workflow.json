@@ -1,0 +1,790 @@
+{
+    "nodes": [
+      {
+        "parameters": {
+          "resource": "draft",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2.1,
+        "position": [
+          -880,
+          720
+        ],
+        "id": "64842593-b3da-43b6-9a7b-f29e8f8b1c3e",
+        "name": "Gmail",
+        "webhookId": "474e3331-0d58-460f-bb8e-a93dd6a3fc85"
+      },
+      {
+        "parameters": {
+          "interval": 5,
+          "unit": "minutes"
+        },
+        "id": "b63e669b-1395-411c-9d02-c8218cbc3a10",
+        "name": "Interval",
+        "type": "n8n-nodes-base.interval",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          1500
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://example.com",
+          "options": {
+            "timeout": 10000
+          }
+        },
+        "id": "283a91b1-5f77-4101-91e8-5a8e25047186",
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -660,
+          1500
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{$json[\"statusCode\"]}}",
+                "operation": "notEqual",
+                "value2": 200
+              }
+            ]
+          }
+        },
+        "id": "292e41e0-9354-4d2c-9822-188ae898c67f",
+        "name": "IF",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -440,
+          1500
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "@monitoring",
+          "text": "🔴 Website Down!\nStatus: {{$json[\"statusCode\"]}}\nTime: {{$now}}",
+          "additionalFields": {}
+        },
+        "id": "9fbc1897-abd6-4222-9c10-55facf09a3c8",
+        "name": "Send Alert",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1,
+        "position": [
+          -220,
+          1500
+        ],
+        "webhookId": "151a8b71-bfae-4082-adb5-d8d706342a8c"
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 2 * * *"
+              }
+            ]
+          }
+        },
+        "id": "3b5ed31c-33a4-4ca8-b9b9-2331f4be8149",
+        "name": "Schedule Trigger",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          980
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT * FROM important_table",
+          "options": {}
+        },
+        "id": "862cc584-f130-4b92-82cc-53b51e6d02fa",
+        "name": "MySQL",
+        "type": "n8n-nodes-base.mySql",
+        "typeVersion": 2,
+        "position": [
+          -660,
+          980
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "upload",
+          "bucketName": "backups",
+          "fileName": "=/db/{{$json[\"fileName\"]}}",
+          "additionalFields": {}
+        },
+        "id": "f00ddbed-f331-4083-8346-b5866ab15080",
+        "name": "AWS S3",
+        "type": "n8n-nodes-base.awsS3",
+        "typeVersion": 1,
+        "position": [
+          -220,
+          980
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "json"
+        },
+        "id": "06b7349b-02f7-4092-8c71-2f1240224830",
+        "name": "Convert to File1",
+        "type": "n8n-nodes-base.convertToFile",
+        "typeVersion": 1,
+        "position": [
+          -440,
+          980
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://api.example.com/data",
+          "options": {}
+        },
+        "id": "289e3c36-ede5-4a90-9873-f8f4d0234cbe",
+        "name": "HTTP Request1",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -880,
+          2020
+        ]
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "698c38a9-b3e4-40d9-9134-43ce3b8127ff",
+        "name": "Convert to File2",
+        "type": "n8n-nodes-base.convertToFile",
+        "typeVersion": 1,
+        "position": [
+          -660,
+          2020
+        ]
+      },
+      {
+        "parameters": {
+          "name": "={{$now.format('YYYY-MM-DD')}}_export.csv",
+          "driveId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "My Drive"
+          },
+          "folderId": {
+            "__rl": true,
+            "mode": "list",
+            "value": "root",
+            "cachedResultName": "/ (Root folder)"
+          },
+          "options": {}
+        },
+        "id": "1d512877-c588-43d2-a37f-cef2e1eef8df",
+        "name": "Google Drive1",
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          -440,
+          2020
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "list",
+          "base": "BASE_ID",
+          "table": "TABLE_ID"
+        },
+        "id": "7ddbfcc2-f387-4110-9c86-0f0091869609",
+        "name": "Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 2,
+        "position": [
+          -880,
+          2800
+        ]
+      },
+      {
+        "parameters": {
+          "resource": "databasePage",
+          "databaseId": "DATABASE_ID",
+          "options": {}
+        },
+        "id": "436a3317-7b40-425d-b8f7-fab3e442e3a0",
+        "name": "Notion",
+        "type": "n8n-nodes-base.notion",
+        "typeVersion": 2,
+        "position": [
+          -660,
+          2800
+        ]
+      },
+      {
+        "parameters": {
+          "events": [
+            "charge.succeeded"
+          ]
+        },
+        "id": "1977ee64-05fd-4113-a8cc-d2a838ce814d",
+        "name": "Stripe Trigger",
+        "type": "n8n-nodes-base.stripeTrigger",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          1760
+        ],
+        "webhookId": "6a229231-cd6a-4c81-9330-1f894e818250"
+      },
+      {
+        "parameters": {
+          "resource": "invoice",
+          "operation": "create",
+          "Line": [],
+          "additionalFields": {}
+        },
+        "id": "e84e39e3-9ac8-4923-b138-64fbacc6802e",
+        "name": "QuickBooks",
+        "type": "n8n-nodes-base.quickbooks",
+        "typeVersion": 1,
+        "position": [
+          -660,
+          1760
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "924e09d2-58ba-4e32-916e-e352e0b5e47f",
+        "name": "Read Binary Files",
+        "type": "n8n-nodes-base.readBinaryFiles",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          1240
+        ]
+      },
+      {
+        "parameters": {
+          "fileFormat": "csv",
+          "options": {}
+        },
+        "id": "da9702af-dbc3-4843-8edb-03d8cdcba4a9",
+        "name": "Spreadsheet File",
+        "type": "n8n-nodes-base.spreadsheetFile",
+        "typeVersion": 2,
+        "position": [
+          -660,
+          1240
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "number": [
+              {
+                "value1": "={{$json[\"amount\"]}}",
+                "operation": "larger",
+                "value2": 100
+              }
+            ]
+          }
+        },
+        "id": "763ed35d-f146-47fe-8a79-e0ee8eed20ed",
+        "name": "Filter",
+        "type": "n8n-nodes-base.filter",
+        "typeVersion": 1,
+        "position": [
+          -440,
+          1240
+        ]
+      },
+      {
+        "parameters": {
+          "fieldsToAggregate": {
+            "fieldToAggregate": [
+              {
+                "fieldToAggregate": "amount"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "952154fc-f409-4fb6-903d-0b0d6bf1b2c8",
+        "name": "Aggregate",
+        "type": "n8n-nodes-base.aggregate",
+        "typeVersion": 1,
+        "position": [
+          -220,
+          1240
+        ]
+      },
+      {
+        "parameters": {},
+        "id": "69500e4b-ab5e-4d94-823d-9e96b152e926",
+        "name": "Start",
+        "type": "n8n-nodes-base.start",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          3940
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Simulate processing that might fail\nif (Math.random() > 0.5) {\n  throw new Error('Processing failed');\n}\nreturn [{json: {status: 'success'}}];"
+        },
+        "id": "7f74f96b-6acf-412b-9b65-87d80606c58c",
+        "name": "Process Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 1,
+        "position": [
+          -660,
+          3940
+        ],
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "boolean": [
+              {
+                "value1": "={{$node[\"Process Data\"].error}}",
+                "value2": true
+              }
+            ]
+          }
+        },
+        "id": "dc5fe834-d454-474b-b642-895bce642051",
+        "name": "IF Error",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          -440,
+          3940
+        ]
+      },
+      {
+        "parameters": {
+          "fromEmail": "n8n@example.com",
+          "toEmail": "admin@example.com",
+          "subject": "Workflow Error",
+          "text": "Error: {{$node[\"Process Data\"].error.message}}",
+          "options": {}
+        },
+        "id": "99724eca-3b4d-481c-b327-829dfd81a0e1",
+        "name": "Send Error Email",
+        "type": "n8n-nodes-base.emailSend",
+        "typeVersion": 2,
+        "position": [
+          -220,
+          3840
+        ],
+        "webhookId": "2dc76aa9-7c66-4e89-ab55-fe7e75f0a831"
+      },
+      {
+        "parameters": {},
+        "id": "cfe82f08-c148-459c-87d6-cac20a76a06c",
+        "name": "Continue Processing",
+        "type": "n8n-nodes-base.noOp",
+        "typeVersion": 1,
+        "position": [
+          -220,
+          4040
+        ]
+      },
+      {
+        "parameters": {
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": "users",
+          "options": {}
+        },
+        "id": "147b0c2f-46e4-427b-92d8-8195c57c11b8",
+        "name": "Postgres",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2,
+        "position": [
+          -660,
+          3060
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://api.example.com/users",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {}
+        },
+        "id": "75b0c623-871d-47a2-9efc-c518a7f2c21c",
+        "name": "HTTP Request2",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [
+          -880,
+          3060
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9 * * *"
+              }
+            ]
+          }
+        },
+        "id": "68981901-88e7-4506-b296-4bbc423ae9ad",
+        "name": "Schedule Trigger1",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          3580
+        ]
+      },
+      {
+        "parameters": {
+          "sendTo": "recipient@example.com",
+          "subject": "Daily Report",
+          "message": "Good morning! Here's your daily update.",
+          "options": {}
+        },
+        "id": "756dbe0a-6384-4473-93ce-2c0b78b012db",
+        "name": "Gmail1",
+        "type": "n8n-nodes-base.gmail",
+        "typeVersion": 2,
+        "position": [
+          -660,
+          3580
+        ],
+        "webhookId": "33f56f20-4960-4171-a21b-ad164d5b0b33"
+      },
+      {
+        "parameters": {
+          "pollTimes": {
+            "item": [
+              {
+                "mode": "everyMinute"
+              }
+            ]
+          },
+          "filters": {}
+        },
+        "id": "54e91f5a-c69a-4268-998e-1ae6c258cdb1",
+        "name": "Gmail Trigger",
+        "type": "n8n-nodes-base.gmailTrigger",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          2540
+        ]
+      },
+      {
+        "parameters": {
+          "text": "📧 New Email\n*From:* {{$json.from}}\n*Subject:* {{$json.subject}}",
+          "otherOptions": {}
+        },
+        "id": "1bdf297a-d5f3-4a5a-8e31-430b6c037f16",
+        "name": "Slack",
+        "type": "n8n-nodes-base.slack",
+        "typeVersion": 2,
+        "position": [
+          -660,
+          2540
+        ],
+        "webhookId": "8991aec0-d7b5-4622-a4f5-8cc4cf0411b5"
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "/form-submit",
+          "options": {}
+        },
+        "id": "3e5bb08a-9baa-472c-b28b-126cee571e3c",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 1,
+        "position": [
+          -880,
+          3320
+        ],
+        "webhookId": "b42afeab-7bf0-4849-9a10-572f1853b2d8"
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "documentId": "SHEET_ID",
+          "sheetName": "Sheet1",
+          "options": {}
+        },
+        "id": "b3984e9c-e8fd-41a1-b34f-9307c0ab7471",
+        "name": "Google Sheets",
+        "type": "n8n-nodes-base.googleSheets",
+        "typeVersion": 4,
+        "position": [
+          -660,
+          3320
+        ]
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "id": "51e233ba-15cb-437e-9655-5451e8506606",
+        "name": "Set",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3,
+        "position": [
+          -880,
+          2280
+        ]
+      }
+    ],
+    "connections": {
+      "Interval": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "IF",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF": {
+        "main": [
+          [
+            {
+              "node": "Send Alert",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "MySQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "MySQL": {
+        "main": [
+          [
+            {
+              "node": "Convert to File1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Convert to File1": {
+        "main": [
+          [
+            {
+              "node": "AWS S3",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request1": {
+        "main": [
+          [
+            {
+              "node": "Convert to File2",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Convert to File2": {
+        "main": [
+          [
+            {
+              "node": "Google Drive1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Airtable": {
+        "main": [
+          [
+            {
+              "node": "Notion",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Stripe Trigger": {
+        "main": [
+          [
+            {
+              "node": "QuickBooks",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Read Binary Files": {
+        "main": [
+          [
+            {
+              "node": "Spreadsheet File",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Spreadsheet File": {
+        "main": [
+          [
+            {
+              "node": "Filter",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Filter": {
+        "main": [
+          [
+            {
+              "node": "Aggregate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "Process Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Process Data": {
+        "main": [
+          [
+            {
+              "node": "IF Error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF Error": {
+        "main": [
+          [
+            {
+              "node": "Send Error Email",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Continue Processing",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request2": {
+        "main": [
+          [
+            {
+              "node": "Postgres",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Schedule Trigger1": {
+        "main": [
+          [
+            {
+              "node": "Gmail1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Gmail Trigger": {
+        "main": [
+          [
+            {
+              "node": "Slack",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Google Sheets",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "pinData": {},
+    "meta": {
+      "templateCredsSetupCompleted": true,
+      "instanceId": "62375cb333bb7eb451d769c5f8df76a42e5395ca4aa036a37eae78b491141162"
+    }
+  }

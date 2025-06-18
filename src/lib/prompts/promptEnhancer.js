@@ -62,7 +62,7 @@ export class PromptEnhancer {
   /**
    * Main enhancement function
    */
-  enhance(userInput, options = {}) {
+  async enhance(userInput, options = {}) {
     const {
       platform = 'n8n',
       complexity = 'moderate',
@@ -116,6 +116,13 @@ export class PromptEnhancer {
       metadata.nodeSuggestions = nodeSuggestions;
     }
 
+    // Add dynamic examples from the example database
+    const dynamicExamples = await this.getDynamicExamples(intent, pattern, platform);
+    if (dynamicExamples) {
+      enhancedPrompt += dynamicExamples;
+      metadata.dynamicExamplesAdded = true;
+    }
+    
     // Add specific examples for detected patterns
     const examples = this.getExamplesForNodes(nodeSuggestions.nodes);
     if (examples.length > 0) {
@@ -478,6 +485,82 @@ IMPORTANT: The user expects a COMPLETE, WORKING workflow. Do not return partial 
       errors,
       warnings
     };
+  }
+  
+  /**
+   * Get dynamic examples from the example database
+   */
+  async getDynamicExamples(intent, pattern, platform) {
+    if (platform !== 'n8n') return '';
+    
+    try {
+      let examples = '';
+      
+      // Get examples by pattern type
+      if (pattern.type && pattern.type !== 'custom') {
+        const patternExamples = await exampleLoader.getExamplesByPattern(pattern.type);
+        if (patternExamples.length > 0) {
+          examples += `\n\n## ${pattern.type.toUpperCase()} PATTERN EXAMPLES:\n`;
+          patternExamples.slice(0, 2).forEach((example, index) => {
+            examples += `\nExample ${index + 1}:\n${JSON.stringify(example, null, 2)}\n`;
+          });
+        }
+      }
+      
+      // Get examples for specific services mentioned in intent
+      if (intent.services.length > 0) {
+        for (const service of intent.services.slice(0, 2)) { // Limit to 2 services
+          const nodeType = this.getNodeTypeForService(service);
+          if (nodeType) {
+            const serviceExamples = await exampleLoader.getExamplesByNodeType(nodeType);
+            if (serviceExamples.length > 0) {
+              examples += `\n\n## ${service.toUpperCase()} INTEGRATION EXAMPLES:\n`;
+              serviceExamples.slice(0, 1).forEach(example => {
+                examples += `\n${JSON.stringify(example, null, 2)}\n`;
+              });
+            }
+          }
+        }
+      }
+      
+      // Get single node examples for complex patterns
+      if (pattern.complexity === 'complex' || intent.conditions.length > 0) {
+        const complexExamples = await exampleLoader.getExamplesByPattern('complexPatterns');
+        if (complexExamples.length > 0) {
+          examples += `\n\n## COMPLEX PATTERN EXAMPLES:\n`;
+          complexExamples.slice(0, 1).forEach(example => {
+            examples += `\n${JSON.stringify(example, null, 2)}\n`;
+          });
+        }
+      }
+      
+      return examples;
+    } catch (error) {
+      console.error('Error loading dynamic examples:', error);
+      return '';
+    }
+  }
+  
+  /**
+   * Map service names to n8n node types
+   */
+  getNodeTypeForService(service) {
+    const serviceMap = {
+      'gmail': 'n8n-nodes-base.gmail',
+      'slack': 'n8n-nodes-base.slack',
+      'sheets': 'n8n-nodes-base.googleSheets',
+      'drive': 'n8n-nodes-base.googleDrive',
+      'airtable': 'n8n-nodes-base.airtable',
+      'notion': 'n8n-nodes-base.notion',
+      'discord': 'n8n-nodes-base.discord',
+      'stripe': 'n8n-nodes-base.stripe',
+      'shopify': 'n8n-nodes-base.shopify',
+      'hubspot': 'n8n-nodes-base.hubspot',
+      'twitter': 'n8n-nodes-base.twitter',
+      'facebook': 'n8n-nodes-base.facebookGraphApi'
+    };
+    
+    return serviceMap[service.toLowerCase()];
   }
 }
 
